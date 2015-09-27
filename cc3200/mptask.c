@@ -61,13 +61,14 @@
 #include "mpexception.h"
 #include "random.h"
 #include "pybi2c.h"
-#include "pybsd.h"
 #include "pins.h"
 #include "pybsleep.h"
 #include "pybtimer.h"
-#include "mpcallback.h"
 #include "cryptohash.h"
+#include "mpirq.h"
 #include "updater.h"
+#include "moduos.h"
+#include "antenna.h"
 
 /******************************************************************************
  DECLARE PRIVATE CONSTANTS
@@ -126,7 +127,7 @@ soft_reset:
 
     // execute all basic initializations
     mpexception_init0();
-    mpcallback_init0();
+    mp_irq_init0();
     pybsleep_init0();
     pin_init0();
     mperror_init0();
@@ -134,9 +135,8 @@ soft_reset:
     timer_init0();
     readline_init0();
     mod_network_init0();
-#if MICROPY_HW_ENABLE_RNG
+    moduos_init0();
     rng_init0();
-#endif
 
 #ifdef LAUNCHXL
     // instantiate the stdio uart on the default pins
@@ -235,17 +235,16 @@ soft_reset_exit:
 
     // disable all callbacks to avoid undefined behaviour
     // when coming out of a soft reset
-    mpcallback_disable_all();
+    mp_irq_disable_all();
+
+    // cancel the RTC alarm which might be running independent of the irq state
+    pyb_rtc_disable_alarm();
 
     // flush the serial flash buffer
     sflash_disk_flush();
 
     // clean-up the user socket space
     modusocket_close_all_user_sockets();
-
-#if MICROPY_HW_HAS_SDCARD
-    pybsd_disable();
-#endif
 
     // wait for pending transactions to complete
     HAL_Delay(20);
@@ -258,9 +257,8 @@ soft_reset_exit:
  ******************************************************************************/
 __attribute__ ((section (".boot")))
 STATIC void mptask_pre_init (void) {
-#if MICROPY_HW_ENABLE_RTC
-    pybrtc_pre_init();
-#endif
+    // this one only makes sense after a poweron reset
+    pyb_rtc_pre_init();
 
     // Create the simple link spawn task
     ASSERT (OSI_OK == VStartSimpleLinkSpawnTask(SIMPLELINK_SPAWN_TASK_PRIORITY));
@@ -279,11 +277,6 @@ STATIC void mptask_pre_init (void) {
 
     // this one allocates memory for the socket semaphore
     modusocket_pre_init();
-
-#if MICROPY_HW_HAS_SDCARD
-    // this one allocates memory for the SD file system
-    pybsd_pre_init();
-#endif
 
     CRYPTOHASH_Init();
 
@@ -368,11 +361,11 @@ STATIC void mptask_init_sflash_filesystem (void) {
 
 STATIC void mptask_enter_ap_mode (void) {
     // append the mac only if it's not the first boot
-    bool append_mac = !PRCMGetSpecialBit(PRCM_FIRST_BOOT_BIT);
-
+    bool add_mac = !PRCMGetSpecialBit(PRCM_FIRST_BOOT_BIT);
     // enable simplelink in ap mode (use the MAC address to make the ssid unique)
-    wlan_sl_enable (ROLE_AP, MICROPY_PORT_WLAN_AP_SSID, strlen(MICROPY_PORT_WLAN_AP_SSID), MICROPY_PORT_WLAN_AP_SECURITY,
-                    MICROPY_PORT_WLAN_AP_KEY, strlen(MICROPY_PORT_WLAN_AP_KEY), MICROPY_PORT_WLAN_AP_CHANNEL, append_mac);
+    wlan_sl_init (ROLE_AP, MICROPY_PORT_WLAN_AP_SSID, strlen(MICROPY_PORT_WLAN_AP_SSID),
+                  MICROPY_PORT_WLAN_AP_SECURITY, MICROPY_PORT_WLAN_AP_KEY, strlen(MICROPY_PORT_WLAN_AP_KEY),
+                  MICROPY_PORT_WLAN_AP_CHANNEL, ANTENNA_TYPE_INTERNAL, add_mac);
 }
 
 STATIC void mptask_create_main_py (void) {
