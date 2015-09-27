@@ -275,11 +275,10 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_socket_accept_obj, esp_socket_accept);
 STATIC mp_obj_t esp_socket_connect(mp_obj_t self_in, mp_obj_t addr_in) {
     esp_socket_obj_t *s = self_in;
 
-    if (s->espconn == NULL || s->espconn->state != ESPCONN_NONE) {
+    if (s->espconn == NULL || (s->espconn->state != ESPCONN_CLOSE && s->espconn->state != ESPCONN_NONE)) {
         nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError,
             "transport endpoint is already connected or closed"));
     }
-
     espconn_regist_connectcb(s->espconn, esp_socket_connect_callback_client);
     espconn_regist_recvcb(s->espconn, esp_socket_recv_callback);
     espconn_regist_sentcb(s->espconn, esp_socket_sent_callback);
@@ -426,6 +425,15 @@ STATIC mp_obj_t esp_socket_ondisconnect(mp_obj_t self_in, mp_obj_t lambda_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(esp_socket_ondisconnect_obj, esp_socket_ondisconnect);
 
+STATIC mp_obj_t esp_socket_state(mp_obj_t self_in) {
+    esp_socket_obj_t *s = self_in;
+    if (s->espconn == NULL)
+        return mp_const_none;
+    else
+        return mp_obj_new_int(s->espconn->state);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_socket_state_obj, esp_socket_state);
+
 typedef struct _esp_getaddrinfo_cb_struct_t {
     mp_obj_t lambda;
     mp_uint_t port;
@@ -492,6 +500,7 @@ STATIC const mp_map_elem_t esp_socket_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_onrecv), (mp_obj_t)&esp_socket_onrecv_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_onsent), (mp_obj_t)&esp_socket_onsent_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_ondisconnect), (mp_obj_t)&esp_socket_ondisconnect_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_state), (mp_obj_t)&esp_socket_state_obj }
 };
 STATIC MP_DEFINE_CONST_DICT(esp_socket_locals_dict, esp_socket_locals_dict_table);
 
@@ -605,6 +614,18 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
         MP_OBJ_NEW_SMALL_INT(SOFTAP_MODE)},
     { MP_OBJ_NEW_QSTR(MP_QSTR_STA_AP_MODE),
         MP_OBJ_NEW_SMALL_INT(STATIONAP_MODE)},
+    { MP_OBJ_NEW_QSTR(MP_QSTR_STA_MODE),
+        MP_OBJ_NEW_SMALL_INT(STATION_MODE)},
+
+     { MP_OBJ_NEW_QSTR(MP_QSTR_ESPCONN_NONE), MP_OBJ_NEW_SMALL_INT(ESPCONN_NONE)},
+     { MP_OBJ_NEW_QSTR(MP_QSTR_ESPCONN_WAIT), MP_OBJ_NEW_SMALL_INT(ESPCONN_WAIT)},
+     { MP_OBJ_NEW_QSTR(MP_QSTR_ESPCONN_CLOSE), MP_OBJ_NEW_SMALL_INT(ESPCONN_CLOSE)},
+     { MP_OBJ_NEW_QSTR(MP_QSTR_ESPCONN_CONNECT), MP_OBJ_NEW_SMALL_INT(ESPCONN_CONNECT)},
+     { MP_OBJ_NEW_QSTR(MP_QSTR_ESPCONN_WRITE), MP_OBJ_NEW_SMALL_INT(ESPCONN_WRITE)},
+     { MP_OBJ_NEW_QSTR(MP_QSTR_ESPCONN_READ), MP_OBJ_NEW_SMALL_INT(ESPCONN_READ)},
+     { MP_OBJ_NEW_QSTR(MP_QSTR_ESPCONN_CLOSE), MP_OBJ_NEW_SMALL_INT(ESPCONN_CLOSE)}
+
+
 #endif
 };
 
