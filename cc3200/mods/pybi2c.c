@@ -292,24 +292,20 @@ STATIC mp_obj_t pyb_i2c_init_helper(pyb_i2c_obj_t *self, const mp_arg_val_t *arg
     mp_obj_t pins_o = args[2].u_obj;
     if (pins_o != mp_const_none) {
         mp_obj_t *pins;
-        mp_uint_t n_pins = 2;
         if (pins_o == MP_OBJ_NULL) {
             // use the default pins
             pins = (mp_obj_t *)pyb_i2c_def_pin;
         } else {
-            mp_obj_get_array(pins_o, &n_pins, &pins);
-            if (n_pins != 2) {
-                goto invalid_args;
-            }
+            mp_obj_get_array_fixed_n(pins_o, 2, &pins);
         }
-        pin_assign_pins_af (pins, n_pins, PIN_TYPE_STD_PU, PIN_FN_I2C, 0);
+        pin_assign_pins_af (pins, 2, PIN_TYPE_STD_PU, PIN_FN_I2C, 0);
     }
 
     // init the I2C bus
     i2c_init(self);
 
     // register it with the sleep module
-    pybsleep_add ((const mp_obj_t)self, (WakeUpCB_t)i2c_init);
+    pyb_sleep_add ((const mp_obj_t)self, (WakeUpCB_t)i2c_init);
 
     return mp_const_none;
 
@@ -360,7 +356,7 @@ STATIC mp_obj_t pyb_i2c_deinit(mp_obj_t self_in) {
     // invalidate the baudrate
     pyb_i2c_obj.baudrate = 0;
     // unregister it with the sleep module
-    pybsleep_remove ((const mp_obj_t)self_in);
+    pyb_sleep_remove ((const mp_obj_t)self_in);
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(pyb_i2c_deinit_obj, pyb_i2c_deinit);

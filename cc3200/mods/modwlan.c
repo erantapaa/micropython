@@ -443,13 +443,16 @@ void wlan_sl_init (int8_t mode, const char *ssid, uint8_t ssid_len, uint8_t auth
     memset(RxFilterIdMask.FilterIdMask, 0xFF, 8);
     ASSERT_ON_ERROR(sl_WlanRxFilterSet(SL_REMOVE_RX_FILTER, (_u8 *)&RxFilterIdMask, sizeof(_WlanRxFilterOperationCommandBuff_t)));
 
-    // switch to the requested mode
-    wlan_set_mode(mode);
-
 #if MICROPY_HW_ANTENNA_DIVERSITY
     // set the antenna type
     wlan_set_antenna (antenna);
 #endif
+
+    // switch to the requested mode
+    wlan_set_mode(mode);
+
+    // stop and start again (we need to in the propper mode from now on)
+    wlan_reenable(mode);
 
     // Set Tx power level for station or AP mode
     // Number between 0-15, as dB offset from max power - 0 will set max power
@@ -457,9 +460,6 @@ void wlan_sl_init (int8_t mode, const char *ssid, uint8_t ssid_len, uint8_t auth
     if (mode == ROLE_AP) {
         ASSERT_ON_ERROR(sl_WlanSet(SL_WLAN_CFG_GENERAL_PARAM_ID, WLAN_GENERAL_PARAM_OPT_AP_TX_POWER, sizeof(ucPower),
                                    (unsigned char *)&ucPower));
-
-        // stop and start again (we need to be in AP mode in order to continue)
-        wlan_reenable(mode);
 
         // configure all parameters
         wlan_set_ssid (ssid, ssid_len, add_mac);
@@ -492,8 +492,6 @@ void wlan_sl_init (int8_t mode, const char *ssid, uint8_t ssid_len, uint8_t auth
     } else { // STA and P2P modes
         ASSERT_ON_ERROR(sl_WlanSet(SL_WLAN_CFG_GENERAL_PARAM_ID, WLAN_GENERAL_PARAM_OPT_STA_TX_POWER,
                                    sizeof(ucPower), (unsigned char *)&ucPower));
-        // stop and start again
-        wlan_reenable(mode);
         // set connection policy to Auto + Fast (tries to connect to the last connected AP)
         ASSERT_ON_ERROR(sl_WlanPolicySet(SL_POLICY_CONNECTION, SL_CONNECTION_POLICY(1, 1, 0, 0, 0), NULL, 0));
     }
@@ -844,7 +842,7 @@ STATIC mp_obj_t wlan_make_new (mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_k
     wlan_init_helper(self, &args[1]);
 
     // pass it to the sleep module
-    pybsleep_set_wlan_obj(self);
+    pyb_sleep_set_wlan_obj(self);
 
     return (mp_obj_t)self;
 }
@@ -911,8 +909,8 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(wlan_scan_obj, wlan_scan);
 STATIC mp_obj_t wlan_connect(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     STATIC const mp_arg_t allowed_args[] = {
         { MP_QSTR_ssid,     MP_ARG_REQUIRED | MP_ARG_OBJ, },
+        { MP_QSTR_auth,                       MP_ARG_OBJ, {.u_obj = mp_const_none} },
         { MP_QSTR_bssid,    MP_ARG_KW_ONLY  | MP_ARG_OBJ, {.u_obj = mp_const_none} },
-        { MP_QSTR_auth,     MP_ARG_KW_ONLY  | MP_ARG_OBJ, {.u_obj = mp_const_none} },
         { MP_QSTR_timeout,  MP_ARG_KW_ONLY  | MP_ARG_OBJ, {.u_obj = mp_const_none} },
     };
 
@@ -930,19 +928,13 @@ STATIC mp_obj_t wlan_connect(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
     const char *ssid = mp_obj_str_get_data(args[0].u_obj, &ssid_len);
     wlan_validate_ssid_len(ssid_len);
 
-    // get the bssid
-    const char *bssid = NULL;
-    if (args[1].u_obj != mp_const_none) {
-        bssid = mp_obj_str_get_str(args[1].u_obj);
-    }
-
     // get the auth config
     uint8_t auth = SL_SEC_TYPE_OPEN;
     mp_uint_t key_len = 0;
     const char *key = NULL;
-    if (args[2].u_obj != mp_const_none) {
+    if (args[1].u_obj != mp_const_none) {
         mp_obj_t *sec;
-        mp_obj_get_array_fixed_n(args[2].u_obj, 2, &sec);
+        mp_obj_get_array_fixed_n(args[1].u_obj, 2, &sec);
         auth = mp_obj_get_int(sec[0]);
         key = mp_obj_str_get_data(sec[1], &key_len);
         wlan_validate_security(auth, key, key_len);
@@ -954,6 +946,12 @@ STATIC mp_obj_t wlan_connect(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
             key = (const char *)&wep_key;
             key_len /= 2;
         }
+    }
+
+    // get the bssid
+    const char *bssid = NULL;
+    if (args[2].u_obj != mp_const_none) {
+        bssid = mp_obj_str_get_str(args[2].u_obj);
     }
 
     // get the timeout

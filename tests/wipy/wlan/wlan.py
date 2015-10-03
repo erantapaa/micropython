@@ -6,10 +6,9 @@ from network import WLAN
 import os
 import time
 import testconfig
-import pyb
 
-machine = os.uname().machine
-if not 'LaunchPad' in machine and not 'WiPy' in machine:
+mch = os.uname().machine
+if not 'LaunchPad' in mch and not 'WiPy' in mch:
     raise Exception('Board not supported!')
 
 
@@ -97,6 +96,8 @@ print(wifi.isconnected() == False)
 
 # test init again
 wifi.init(WLAN.AP, ssid='www.wipy.io', auth=None, channel=5, antenna=WLAN.INT_ANT)
+
+print(len(wifi.mac()) == 6)
 
 # next ones MUST raise
 try:

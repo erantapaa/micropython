@@ -2,13 +2,13 @@
 RTC IRQ test for the CC3200 based boards.
 '''
 
-from pyb import RTC
-from pyb import Sleep
+from machine import RTC
+import machine
 import os
 import time
 
-machine = os.uname().machine
-if not 'LaunchPad' in machine and not 'WiPy' in machine:
+mch = os.uname().machine
+if not 'LaunchPad' in mch and not 'WiPy' in mch:
     raise Exception('Board not supported!')
 
 def rtc_ticks_ms(rtc):
@@ -47,9 +47,9 @@ print(rtc_irq_count == 10)
 rtc.alarm_cancel()
 rtc_irq_count = 0
 rtc.alarm(time=50, repeat=True)
-rtc_irq.init(trigger=RTC.ALARM0, handler=alarm_handler, wake=Sleep.SUSPENDED | Sleep.ACTIVE)
+rtc_irq.init(trigger=RTC.ALARM0, handler=alarm_handler, wake=machine.SLEEP | machine.IDLE)
 while rtc_irq_count < 3:
-    Sleep.suspend()
+    machine.sleep()
 print(rtc_irq_count == 3)
 
 # no repetition
@@ -62,20 +62,20 @@ print(rtc_irq_count == 1)
 rtc.alarm_cancel()
 t0 = rtc_ticks_ms(rtc)
 rtc.alarm(time=500, repeat=False)
-Sleep.suspend()
+machine.sleep()
 t1 = rtc_ticks_ms(rtc)
 print(abs(t1 - t0 - 500) < 20)
 
 # deep sleep repeated mode
 rtc.alarm_cancel()
 rtc_irq_count = 0
-rtc.alarm(time=250, repeat=True)
+rtc.alarm(time=500, repeat=True)
 t0 = rtc_ticks_ms(rtc)
-rtc_irq = rtc.irq(trigger=RTC.ALARM0, handler=alarm_handler, wake=Sleep.SUSPENDED)
-while rtc_irq_count < 10:
-    Sleep.suspend()
+rtc_irq = rtc.irq(trigger=RTC.ALARM0, handler=alarm_handler, wake=machine.SLEEP)
+while rtc_irq_count < 3:
+    machine.sleep()
     t1 = rtc_ticks_ms(rtc)
-    print(abs(t1 - t0 - (250 * rtc_irq_count)) < 25) 
+    print(abs(t1 - t0 - (500 * rtc_irq_count)) < 25)
 
 # next ones must raise
 try:

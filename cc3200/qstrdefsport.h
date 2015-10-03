@@ -25,28 +25,42 @@
  * THE SOFTWARE.
  */
 
-// qstrs specific to this port
-Q(__name__)
-Q(help)
-Q(pyb)
+// for machine module
+Q(machine)
+#ifdef DEBUG
 Q(info)
+#endif
 Q(reset)
 Q(main)
 Q(sync)
-Q(gc)
 Q(rng)
-Q(toggle)
-Q(write)
-Q(input)
 Q(freq)
 Q(unique_id)
 Q(disable_irq)
 Q(enable_irq)
-Q(flush)
-Q(repl_uart)
+Q(idle)
+Q(sleep)
+Q(deepsleep)
+Q(reset_cause)
+Q(wake_reason)
+Q(IDLE)
+Q(SLEEP)
+Q(DEEPSLEEP)
+Q(POWER_ON)
+Q(HARD_RESET)
+Q(WDT_RESET)
+Q(DEEPSLEEP_RESET)
+Q(SOFT_RESET)
+Q(WLAN_WAKE)
+Q(PIN_WAKE)
+Q(RTC_WAKE)
+
 // entries for sys.path
 Q(/flash)
 Q(/flash/lib)
+
+// interactive help
+Q(help)
 
 // for module weak links
 Q(struct)
@@ -54,7 +68,7 @@ Q(binascii)
 Q(re)
 Q(json)
 Q(heapq)
-Q(hashlib)
+//Q(hashlib)
 
 // for os module
 Q(os)
@@ -81,6 +95,7 @@ Q(urandom)
 Q(mkfs)
 Q(mount)
 Q(unmount)
+Q(dupterm)
 Q(readonly)
 Q(readblocks)
 Q(writeblocks)
@@ -90,6 +105,8 @@ Q(count)
 // for file class
 Q(seek)
 Q(tell)
+Q(input)
+Q(flush)
 
 // for Pin class
 Q(Pin)
@@ -313,25 +330,6 @@ Q(handler)
 Q(priority)
 Q(wake)
 
-// for Sleep class
-Q(Sleep)
-Q(idle)
-Q(suspend)
-Q(hibernate)
-Q(reset_cause)
-Q(wake_reason)
-Q(ACTIVE)
-Q(SUSPENDED)
-Q(HIBERNATING)
-Q(POWER_ON)
-Q(HARD_RESET)
-Q(WDT_RESET)
-Q(HIB_RESET)
-Q(SOFT_RESET)
-Q(WLAN_WAKE)
-Q(PIN_WAKE)
-Q(RTC_WAKE)
-
 // for SPI class
 Q(SPI)
 Q(id)
@@ -348,7 +346,6 @@ Q(read)
 Q(readinto)
 Q(write_readinto)
 Q(nbytes)
-Q(write)
 Q(buf)
 Q(MASTER)
 Q(MSB)
@@ -379,12 +376,12 @@ Q(POSITIVE)
 Q(NEGATIVE)
 
 // for uhashlib module
-Q(uhashlib)
-Q(update)
-Q(digest)
+//Q(uhashlib)
+//Q(update)
+//Q(digest)
 //Q(md5)
-Q(sha1)
-Q(sha256)
+//Q(sha1)
+//Q(sha256)
 
 // for ubinascii module
 Q(ubinascii)

@@ -55,6 +55,7 @@
 #include "pin.h"
 #include "pybpin.h"
 #include "pins.h"
+#include "moduos.h"
 
 /// \moduleref pyb
 /// \class UART - duplex serial communication bus
@@ -168,15 +169,6 @@ bool uart_tx_strn(pyb_uart_obj_t *self, const char *str, uint len) {
     return true;
 }
 
-void uart_tx_strn_cooked(pyb_uart_obj_t *self, const char *str, uint len) {
-    for (const char *top = str + len; str < top; str++) {
-        if (*str == '\n') {
-            uart_tx_char(self, '\r');
-        }
-        uart_tx_char(self, *str);
-    }
-}
-
 /******************************************************************************
  DEFINE PRIVATE FUNCTIONS
  ******************************************************************************/
@@ -261,12 +253,10 @@ STATIC void UARTGenericIntHandler(uint32_t uart_id) {
         MAP_UARTIntClear(self->reg, UART_INT_RX | UART_INT_RT);
         while (UARTCharsAvail(self->reg)) {
             int data = MAP_UARTCharGetNonBlocking(self->reg);
-            if (pyb_stdio_uart == self && data == user_interrupt_char) {
+            if (MP_STATE_PORT(os_term_dup_obj) && MP_STATE_PORT(os_term_dup_obj)->stream_o == self && data == user_interrupt_char) {
                 // raise an exception when interrupts are finished
                 mpexception_keyboard_nlr_jump();
-            }
-            // there's always a read buffer available
-            else {
+            } else { // there's always a read buffer available
                 uint16_t next_head = (self->read_buf_head + 1) % PYBUART_RX_BUFFER_LEN;
                 if (next_head != self->read_buf_tail) {
                     // only store data if room in buf
@@ -433,7 +423,7 @@ STATIC mp_obj_t pyb_uart_init_helper(pyb_uart_obj_t *self, const mp_arg_val_t *a
     // initialize and enable the uart
     uart_init (self);
     // register it with the sleep module
-    pybsleep_add ((const mp_obj_t)self, (WakeUpCB_t)uart_init);
+    pyb_sleep_add ((const mp_obj_t)self, (WakeUpCB_t)uart_init);
     // enable the callback
     uart_irq_new (self, UART_TRIGGER_RX_ANY, INT_PRIORITY_LVL_3, mp_const_none);
     // disable the irq (from the user point of view)
@@ -508,7 +498,7 @@ STATIC mp_obj_t pyb_uart_deinit(mp_obj_t self_in) {
     pyb_uart_obj_t *self = self_in;
 
     // unregister it with the sleep module
-    pybsleep_remove (self);
+    pyb_sleep_remove (self);
     // invalidate the baudrate
     self->baudrate = 0;
     // free the read buffer
