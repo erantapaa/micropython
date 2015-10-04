@@ -52,6 +52,7 @@ typedef struct _esp_socket_obj_t {
     mp_obj_t cb_recv;
     mp_obj_t cb_sent;
     mp_obj_t cb_disconnect;
+    mp_obj_t cb_reconnect;
 
     uint8_t *recvbuf;
     mp_uint_t recvbuf_len;
@@ -73,6 +74,7 @@ STATIC mp_obj_t esp_socket_make_new_base() {
     s->cb_connect = mp_const_none;
     s->cb_recv = mp_const_none;
     s->cb_disconnect = mp_const_none;
+    s->cb_reconnect = mp_const_none;
     s->cb_sent = mp_const_none;
     s->fromserver = false;
     s->connlist = NULL;
@@ -187,7 +189,16 @@ STATIC void esp_socket_disconnect_callback(void *arg) {
     if (s->cb_disconnect != mp_const_none) {
         call_function_1_protected(s->cb_disconnect, s);
     }
+    //esp_socket_close(s);
+}
 
+STATIC void esp_socket_reconnect_callback(void *arg, sint8 err) {
+    struct espconn *conn = arg;
+    esp_socket_obj_t *s = conn->reverse;
+
+    if (s->cb_reconnect != mp_const_none) {
+        call_function_1_protected(s->cb_reconnect, s);
+    }
     esp_socket_close(s);
 }
 
@@ -202,6 +213,7 @@ STATIC void esp_socket_connect_callback_server(void *arg) {
     espconn_regist_recvcb(conn, esp_socket_recv_callback);
     espconn_regist_sentcb(conn, esp_socket_sent_callback);
     espconn_regist_disconcb(conn, esp_socket_disconnect_callback);
+    espconn_regist_reconcb(conn, esp_socket_reconnect_callback);
     espconn_regist_time(conn, 15, 0);
 
     if (esp_socket_listening->cb_connect != mp_const_none) {
@@ -283,6 +295,7 @@ STATIC mp_obj_t esp_socket_connect(mp_obj_t self_in, mp_obj_t addr_in) {
     espconn_regist_recvcb(s->espconn, esp_socket_recv_callback);
     espconn_regist_sentcb(s->espconn, esp_socket_sent_callback);
     espconn_regist_disconcb(s->espconn, esp_socket_disconnect_callback);
+    espconn_regist_reconcb(s->espconn, esp_socket_reconnect_callback);
 
     s->espconn->proto.tcp->remote_port =
         netutils_parse_inet_addr(addr_in, s->espconn->proto.tcp->remote_ip,
@@ -418,12 +431,20 @@ STATIC mp_obj_t esp_socket_ondisconnect(mp_obj_t self_in, mp_obj_t lambda_in) {
     s->cb_disconnect = lambda_in;
 
     if (s->espconn->state == ESPCONN_CLOSE) {
+        printf("Calling oon account of close\n");
         call_function_1_protected(s->cb_disconnect, s);
     }
 
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(esp_socket_ondisconnect_obj, esp_socket_ondisconnect);
+
+STATIC mp_obj_t esp_socket_onreconnect(mp_obj_t self_in, mp_obj_t lambda_in) {
+    esp_socket_obj_t *s = self_in;
+    s->cb_reconnect = lambda_in;
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(esp_socket_onreconnect_obj, esp_socket_onreconnect);
 
 STATIC mp_obj_t esp_socket_state(mp_obj_t self_in) {
     esp_socket_obj_t *s = self_in;
@@ -500,6 +521,7 @@ STATIC const mp_map_elem_t esp_socket_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_onrecv), (mp_obj_t)&esp_socket_onrecv_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_onsent), (mp_obj_t)&esp_socket_onsent_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_ondisconnect), (mp_obj_t)&esp_socket_ondisconnect_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_onreconnect), (mp_obj_t)&esp_socket_onreconnect_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_state), (mp_obj_t)&esp_socket_state_obj }
 };
 STATIC MP_DEFINE_CONST_DICT(esp_socket_locals_dict, esp_socket_locals_dict_table);

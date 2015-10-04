@@ -69,6 +69,7 @@ STATIC void timer_common_callback(void *parg) {
         } else {
             mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
         }
+        gc_collect();
     }
 }
 
