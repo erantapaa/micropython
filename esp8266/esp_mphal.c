@@ -32,11 +32,13 @@
 #include "user_interface.h"
 
 extern void ets_wdt_disable(void);
+extern void ets_wdt_enable(void);
 extern void wdt_feed(void);
 extern void ets_delay_us();
 
 void mp_hal_init(void) {
-    ets_wdt_disable(); // it's a pain while developing
+    // ets_wdt_disable(); // it's a pain while developing
+    ets_wdt_enable(); 
     uart_init(UART_BIT_RATE_115200, UART_BIT_RATE_115200);
 }
 
