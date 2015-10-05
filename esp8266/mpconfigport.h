@@ -38,6 +38,7 @@
 #define MICROPY_FLOAT_IMPL          (MICROPY_FLOAT_IMPL_NONE)
 #define MICROPY_ERROR_REPORTING     (MICROPY_ERROR_REPORTING_TERSE)
 #define MICROPY_MODULE_FROZEN       (1)
+#define MICROPY_PY_URE              (1)
 
 // type definitions for the specific machine
 
@@ -68,6 +69,7 @@ extern const struct _mp_obj_module_t esp_module;
 extern const struct _mp_obj_module_t network_module;
 extern const struct _mp_obj_module_t utime_module;
 extern const struct _mp_obj_module_t uos_module;
+extern const struct _mp_obj_module_t mp_module_ure;
 
 #define MICROPY_PORT_BUILTIN_MODULES \
     { MP_OBJ_NEW_QSTR(MP_QSTR_pyb), (mp_obj_t)&pyb_module }, \
@@ -79,6 +81,8 @@ extern const struct _mp_obj_module_t uos_module;
 #define MICROPY_PORT_BUILTIN_MODULE_WEAK_LINKS \
     { MP_OBJ_NEW_QSTR(MP_QSTR_time), (mp_obj_t)&utime_module }, \
     { MP_OBJ_NEW_QSTR(MP_QSTR_os), (mp_obj_t)&uos_module }, \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_re), (mp_obj_t)&mp_module_ure }, \
+
 
 #define MP_STATE_PORT MP_STATE_VM
 
