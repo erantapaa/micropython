@@ -95,7 +95,10 @@ Q(SLEEP_MODEM)
 Q(STA_MODE)
 Q(AP_MODE)
 Q(STA_AP_MODE)
-
+// os_task
+Q(os_task)
+Q(__init__)
+Q(post)
 // network module
 Q(network)
 Q(WLAN)
@@ -156,3 +159,13 @@ Q(repeat)
 Q(cancel)
 
 Q(re)
+Q(json)
+
+// mod_esp_gpio
+Q(print)
+Q(toggle)
+Q(esp_gpio)
+
+// mod_esp_dht
+Q(dht)
+

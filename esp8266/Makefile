@@ -9,7 +9,7 @@ include ../py/py.mk
 MAKE_FROZEN = ../tools/make-frozen.py
 
 SCRIPTDIR = scripts
-PORT = /dev/ttyACM0
+PORT = /dev/ttyUSB0
 BAUD = 115200
 CROSS_COMPILE = xtensa-lx106-elf-
 ESP_SDK = $(shell $(CC) -print-sysroot)/usr
@@ -65,6 +65,7 @@ SRC_C = \
 	moduos.c \
 	utils.c \
 	os_timer.c \
+	os_task.c \
 	$(BUILD)/frozen.c \
 
 STM_SRC_C = $(addprefix stmhal/,\
