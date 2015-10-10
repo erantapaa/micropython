@@ -41,6 +41,9 @@
 #include "spi_flash.h"
 #include "utils.h"
 #include "os_timer.h"
+#include "os_task.h"
+#include "mod_esp_gpio.h"
+#include "mod_esp_dht.h"
 
 STATIC const mp_obj_type_t esp_socket_type;
 
@@ -602,6 +605,17 @@ STATIC mp_obj_t esp_flash_id() {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_flash_id_obj, esp_flash_id);
 
+
+// STATIC mp_obj_t ICACHE_FLASH_ATTR esp__init__() {
+STATIC mp_obj_t esp__init__(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    printf("called init");
+    esp_os_task_init();
+    esp_gpio_init();
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp__init__obj, esp__init__);
+
+
 STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_esp) },
 
@@ -614,6 +628,10 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_flash_id), (mp_obj_t)&esp_flash_id_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_socket), (mp_obj_t)&esp_socket_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_os_timer), (mp_obj_t)&esp_os_timer_type },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_os_task), (mp_obj_t)&esp_os_task_type },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_gpio), (mp_obj_t)&mp_module_esp_gpio },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_dht), (mp_obj_t)&esp_dht_type },
+    { MP_OBJ_NEW_QSTR(MP_QSTR___init__), (mp_obj_t)&esp__init__obj },
 
 #if MODESP_INCLUDE_CONSTANTS
     { MP_OBJ_NEW_QSTR(MP_QSTR_MODE_11B),

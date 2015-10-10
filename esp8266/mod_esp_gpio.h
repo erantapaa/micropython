@@ -26,5 +26,35 @@
 
 #ifndef _INCLUDED_MOD_ESP_GPIO_H_
 #define _INCLUDED_MOD_ESP_GPIO_H_
-extern const mp_obj_type_t esp_os_timer_type;
+// extern const mp_obj_type_t esp_os_timer_type;
+
+typedef int (*isr_t)(void *, uint32_t now, uint8_t signal);
+
+typedef struct {
+    bool level;
+    uint32_t period;
+} event_t;
+
+typedef struct {
+    uint16_t pin;
+    uint32_t periph;
+    uint16_t func;
+    isr_t isr;
+    void *data;
+    int last_result;
+    event_t *events;
+    uint16_t ecount;
+    uint16_t n_events;
+    uint32_t start_time;
+} pmap_t;
+
+
+extern pmap_t *pmap(int inpin);
+extern void ICACHE_FLASH_ATTR esp_gpio_isr_attach(pmap_t *pmp, isr_t vect, void *data, uint16_t n_events);
+extern bool ICACHE_FLASH_ATTR esp_gpio_isr_detach(uint8_t pin);
+extern void ICACHE_FLASH_ATTR esp_gpio_init();
+
+#define SENSOR_TASK_ID 1
+
+extern const mp_obj_module_t mp_module_esp_gpio;
 #endif // _INCLUDED_MOD_ESP_GPIO_H_

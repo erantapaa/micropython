@@ -66,6 +66,8 @@ SRC_C = \
 	utils.c \
 	os_timer.c \
 	os_task.c \
+	mod_esp_gpio.c \
+	mod_esp_dht.c \
 	$(BUILD)/frozen.c \
 
 STM_SRC_C = $(addprefix stmhal/,\

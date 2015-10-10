@@ -163,9 +163,10 @@ Q(json)
 
 // mod_esp_gpio
 Q(print)
-Q(toggle)
-Q(esp_gpio)
+// Q(toggle)
+Q(gpio)
 
 // mod_esp_dht
 Q(dht)
+Q(arg)
 

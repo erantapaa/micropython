@@ -70,6 +70,7 @@ STATIC os_event_t sensor_evt_queue[16];
 
 void    esp_os_task_init() {
     system_os_task(task_common_callback, SENSOR_TASK_ID, sensor_evt_queue, sizeof(sensor_evt_queue) / sizeof(*sensor_evt_queue));
+    printf("init os_task\n");
 }
 
 STATIC const mp_arg_t esp_os_task_init_args[] = {
