@@ -55,7 +55,7 @@
 #include "utils.h"
 #include "mod_esp_gpio.h"
 #include "mod_esp_dht.h"
-
+#include "os_task.h"
 
 
 #define TIME system_get_time
@@ -90,11 +90,12 @@ typedef struct _mp_obj_dht_t {
     uint16_t bits;
     uint8_t bytes[DHT_BYTES];
     uint8_t current[DHT_BYTES];
-    mp_obj_t callback;
+    mp_obj_t task;
 } mp_obj_dht_t;
 
 //TODO make a class to pass the final result
 
+#define DHT_CALL_FAILED -2
 #define DHT_ERROR -1
 #define DHT_STATE_NEW 0
 #define DHT_STATE_HPL 1
@@ -143,12 +144,12 @@ STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
 STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     (void)kind;
     mp_obj_dht_t *self = self_in;
-        mp_printf(print, "<_dht %d %s inters %d bits %d callback %x>\n",
+        mp_printf(print, "<_dht %d %s inters %d bits %d task %x>\n",
             self->state,
             self->error,
             self->inters,
             self->bits,
-            (unsigned)self->callback);
+            (unsigned)&self->task);
     for (int ii = 0; ii < DHT_BYTES; ii++) {
         printf("%d,\'%2x\',%u,\'"BYTETOBINARYPATTERN"\'\n", ii, self->bytes[ii], self->bytes[ii], BYTETOBINARY(self->bytes[ii]));
     }
@@ -158,12 +159,12 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
 }
 
 STATIC const mp_arg_t esp_dht_init_args[] = {
-    { MP_QSTR_pin, MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0} },
-    { MP_QSTR_callback,    MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
+    { MP_QSTR_pin, MP_ARG_REQUIRED | MP_ARG_INT },
+    { MP_QSTR_task, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
 };
 #define ESP_DHT_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_dht_init_args)
 
-// takes (pin=x, callback=yyy)
+// takes (pin=x, task=yyy)
 STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_val_t vals[ESP_DHT_INIT_NUM_ARGS];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, ESP_DHT_INIT_NUM_ARGS, esp_dht_init_args, vals);
@@ -172,8 +173,14 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
     pmap_t *pmp = pmap(gpio_pin);
     mp_obj_dht_t *self  =  dht_new(pmp);
 
-    self->callback = vals[1].u_obj;
-
+    if (vals[1].u_obj != mp_const_none) {
+        if (MP_OBJ_IS_TYPE(vals[1].u_obj, &esp_os_task_type)) {
+            self->task = vals[1].u_obj;
+        } else {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "task needs to be an esp.os_task type"));
+        }
+    } 
+    // TODO: move these to the esp_gpio module
     GPIO_REG_WRITE(GPIO_ENABLE_W1TS_ADDRESS, (1<<gpio_pin));
     gpio_pin_intr_state_set(GPIO_ID_PIN(pmp->pin), GPIO_PIN_INTR_ANYEDGE);  
     GPIO_OUTPUT_SET(pmp->pin, 1);
@@ -245,7 +252,16 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
         if (self->bits == 40) {
             self->state = DHT_STATE_ENDED;
             memcpy(self->current, self->bytes, DHT_BYTES);
-            // system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self);
+            if (self->task != mp_const_none) {
+                nlr_buf_t nlr;
+                if (nlr_push(&nlr) == 0) {
+                    mp_obj_t dest[2];
+                    mp_load_method(self->task, MP_QSTR_post, dest);
+                    mp_call_method_n_kw(0, 0, dest);
+                } else {
+                    self->state = DHT_CALL_FAILED;
+                }
+            }
             return 0;
         }
         break;
@@ -253,7 +269,7 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
     return 0;
 }
 
-
+// TODO: remove this and use the system module if it can't be pre-empted
 STATIC void  delay_us(int delay) {
     uint32_t count0 = xthal_get_ccount(); 
     uint32_t delayCount = delay * ets_get_cpu_frequency();
@@ -266,6 +282,7 @@ STATIC void dht_host_up(void *parg)
     mp_obj_dht_t *self = (mp_obj_dht_t *)parg;
     os_timer_disarm(&self->timer);
     
+    // TODO: move these to the esp_gpio module
     GPIO_OUTPUT_SET(self->pmp->pin, 1);
     delay_us(30);
     GPIO_OUTPUT_SET(self->pmp->pin, 0);
@@ -301,7 +318,7 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t l
     if (elapsed < READ_WAIT) {
         return mp_obj_new_int(READ_WAIT - elapsed);   // call back in 2 seconds
     }
-    dhtx_reset_values(self);
+    dhtx_reset_values(self);        // TODO: to esp_gpio
     GPIO_OUTPUT_SET(self->pmp->pin, 0);
     self->state = DHT_STATE_HPL;
     self->last_read_time = system_get_time() / 1000;
@@ -316,12 +333,36 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t l
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_recv_obj, mod_esp_dht_recv);
 
+STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_test(mp_obj_t self_in, mp_obj_t len_in) {
+    printf("test call\n");
+    mp_obj_dht_t *self = self_in;
+    if (self->task != mp_const_none) {
+        if (MP_OBJ_IS_TYPE(self->task, &esp_os_task_type)) {
+            printf("is task\n");
+        } else {
+            printf("is not task\n");
+        }
+        nlr_buf_t nlr;
+        if (nlr_push(&nlr) == 0) {
+            mp_obj_t dest[2];
+            mp_load_method(self->task, MP_QSTR_post, dest);
+            printf("About to call\n");
+            mp_call_method_n_kw(0, 0, dest);
+        } else {
+            mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+        }
+    }
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_test_obj, mod_esp_dht_test);
+
 
 STATIC const mp_map_elem_t dht_locals_dict_table[] = {
 //    { MP_OBJ_NEW_QSTR(MP_QSTR___del__), (mp_obj_t)&mod_esp_dht___del___obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_values), (mp_obj_t)&mod_esp_dht_values_obj},
     { MP_OBJ_NEW_QSTR(MP_QSTR_state), (mp_obj_t)&mod_esp_dht_state_obj},
-    { MP_OBJ_NEW_QSTR(MP_QSTR_recv), (mp_obj_t)&mod_esp_dht_recv_obj}
+    { MP_OBJ_NEW_QSTR(MP_QSTR_recv), (mp_obj_t)&mod_esp_dht_recv_obj},
+    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_dht_test_obj}
 };
 
 STATIC MP_DEFINE_CONST_DICT(dht_locals_dict, dht_locals_dict_table);

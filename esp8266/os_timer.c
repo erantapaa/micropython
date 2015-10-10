@@ -74,8 +74,8 @@ STATIC void timer_common_callback(void *parg) {
 }
 
 STATIC const mp_arg_t esp_os_timer_init_args[] = {
-    { MP_QSTR_callback, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
-    { MP_QSTR_period, MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0} },
+    { MP_QSTR_callback, MP_ARG_REQUIRED | MP_ARG_OBJ},
+    { MP_QSTR_period, MP_ARG_REQUIRED | MP_ARG_INT},
     { MP_QSTR_repeat, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_bool = true} }
 };
 #define PYB_TIMER_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_os_timer_init_args)

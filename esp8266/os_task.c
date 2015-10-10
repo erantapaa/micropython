@@ -41,10 +41,6 @@
 #include "os_task.h"
 
 
-typedef struct _esp_os_task_obj_t {
-    mp_obj_base_t base;
-    mp_obj_t callback;
-} esp_os_task_obj_t;
 
 
 STATIC void esp_os_task_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
@@ -74,7 +70,7 @@ void    esp_os_task_init() {
 }
 
 STATIC const mp_arg_t esp_os_task_init_args[] = {
-    { MP_QSTR_callback, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
+    { MP_QSTR_callback, MP_ARG_REQUIRED | MP_ARG_OBJ },
 };
 #define PYB_TASK_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_os_task_init_args)
 
@@ -101,7 +97,6 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_os_timer_cancel_obj, esp_os_timer_cancel);
 STATIC mp_obj_t esp_os_task_post(mp_obj_t self_in) {
     esp_os_task_obj_t *self = self_in;
     system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self);
-    
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_os_task_post_obj, esp_os_task_post);
