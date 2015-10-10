@@ -169,4 +169,5 @@ Q(gpio)
 // mod_esp_dht
 Q(dht)
 Q(arg)
+Q(pin)
 

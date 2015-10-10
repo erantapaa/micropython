@@ -91,7 +91,6 @@ typedef struct _mp_obj_dht_t {
     uint8_t bytes[DHT_BYTES];
     uint8_t current[DHT_BYTES];
     mp_obj_t callback;
-    mp_obj_t callback_arg;
 } mp_obj_dht_t;
 
 //TODO make a class to pass the final result
@@ -110,7 +109,7 @@ typedef struct _mp_obj_dht_t {
 #define LOW 0
 #define HIGH 1
 
-STATIC void    ICACHE_FLASH_ATTR dhtx_clear(mp_obj_dht_t *self) {
+STATIC void    ICACHE_FLASH_ATTR dhtx_reset_values(mp_obj_dht_t *self) {
     self->inters = 0;
     self->bits = 0;
     self->state = DHT_STATE_NEW;
@@ -125,7 +124,7 @@ STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
     mp_obj_dht_t *dhto = m_new_obj(mp_obj_dht_t);
     dhto->base.type = &esp_dht_type;
     dhto->pmp = pmp;
-    dhtx_clear(dhto);
+    dhtx_reset_values(dhto);
     esp_gpio_isr_attach(pmp, dhtx, dhto, 50);
     return dhto;
 }
@@ -159,35 +158,22 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
 }
 
 STATIC const mp_arg_t esp_dht_init_args[] = {
+    { MP_QSTR_pin, MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 0} },
     { MP_QSTR_callback,    MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
-    { MP_QSTR_arg,         MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} }
 };
 #define ESP_DHT_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_dht_init_args)
 
-STATIC mp_obj_dht_t *esp_dht_init_helper(mp_obj_dht_t *self, uint n_args, const mp_obj_t *args, mp_map_t *kw_args) {
-    mp_arg_val_t vals[ESP_DHT_INIT_NUM_ARGS];
-    mp_arg_parse_all(n_args, args, kw_args, ESP_DHT_INIT_NUM_ARGS, esp_dht_init_args, vals);
-    self->callback = vals[0].u_obj;
-    self->callback_arg = vals[1].u_obj;
-    return self;
-}
-
-
 // takes (pin=x, callback=yyy)
-STATIC mp_obj_t ICACHE_FLASH_ATTR dht_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    (void)type_in;
-    mp_arg_check_num(n_args, n_kw, 1, MP_OBJ_FUN_ARGS_MAX, true);
-    int gpio_pin = mp_obj_get_int(args[0]);
+STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    mp_arg_val_t vals[ESP_DHT_INIT_NUM_ARGS];
+    mp_arg_parse_all_kw_array(n_args, n_kw, args, ESP_DHT_INIT_NUM_ARGS, esp_dht_init_args, vals);
+
+    int gpio_pin = vals[0].u_int;
     pmap_t *pmp = pmap(gpio_pin);
     mp_obj_dht_t *self  =  dht_new(pmp);
-    self->callback = NULL;
-    self->callback_arg = NULL;
-    memset(self->current, 0, DHT_BYTES);
-    if (n_args > 1 || n_kw > 0) {
-        mp_map_t kw_args;
-        mp_map_init_fixed_table(&kw_args, n_kw, args + n_args);
-        self = esp_dht_init_helper(self, n_args - 1, args + 1, &kw_args);
-    }
+
+    self->callback = vals[1].u_obj;
+
     GPIO_REG_WRITE(GPIO_ENABLE_W1TS_ADDRESS, (1<<gpio_pin));
     gpio_pin_intr_state_set(GPIO_ID_PIN(pmp->pin), GPIO_PIN_INTR_ANYEDGE);  
     GPIO_OUTPUT_SET(pmp->pin, 1);
@@ -315,11 +301,7 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t l
     if (elapsed < READ_WAIT) {
         return mp_obj_new_int(READ_WAIT - elapsed);   // call back in 2 seconds
     }
-    // this is not useful as the chip can often crash
-    //  if ((self->state != DHT_STATE_ENDED && self->state != DHT_STATE_NEW))
-    //     return mp_obj_new_int(2000);   // call back in 2 seconds
-
-    dhtx_clear(self);
+    dhtx_reset_values(self);
     GPIO_OUTPUT_SET(self->pmp->pin, 0);
     self->state = DHT_STATE_HPL;
     self->last_read_time = system_get_time() / 1000;
@@ -333,14 +315,6 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t l
     return mp_obj_new_int(0);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_recv_obj, mod_esp_dht_recv);
-
-
-STATIC  mp_obj_t mod_esp_test(mp_obj_t start) {
-    // uint32_t delay = mp_obj_get_int(start);
-    return mp_obj_new_int(system_get_time() / 1000);
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_test_obj, mod_esp_test);
-
 
 
 STATIC const mp_map_elem_t dht_locals_dict_table[] = {
