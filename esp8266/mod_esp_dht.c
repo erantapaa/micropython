@@ -255,9 +255,13 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
             if (self->task != mp_const_none) {
                 nlr_buf_t nlr;
                 if (nlr_push(&nlr) == 0) {
-                    mp_obj_t dest[2];
-                    mp_load_method(self->task, MP_QSTR_post, dest);
-                    mp_call_method_n_kw(0, 0, dest);
+                    mp_obj_t dest;
+                    mp_load_method(self->task, MP_QSTR_post, &dest);
+                     const mp_obj_t args[] = {
+                        dest,
+                        MP_OBJ_NEW_QSTR(MP_QSTR_arg),  MP_OBJ_NEW_SMALL_INT(666)
+                    };
+                    mp_call_method_n_kw(0, 1, args);
                 } else {
                     self->state = DHT_CALL_FAILED;
                 }
@@ -346,8 +350,12 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_test(mp_obj_t self_in, mp_obj_t le
         if (nlr_push(&nlr) == 0) {
             mp_obj_t dest[2];
             mp_load_method(self->task, MP_QSTR_post, dest);
-            printf("About to call\n");
-            mp_call_method_n_kw(0, 0, dest);
+             const mp_obj_t args[] = {
+                dest[0],
+                dest[1],
+                MP_OBJ_NEW_QSTR(MP_QSTR_arg),  MP_OBJ_NEW_SMALL_INT(666)
+            };
+            mp_call_method_n_kw(0, 1, args);
         } else {
             mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
         }
