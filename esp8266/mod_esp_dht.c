@@ -255,12 +255,11 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
             if (self->task != mp_const_none) {
                 nlr_buf_t nlr;
                 if (nlr_push(&nlr) == 0) {
-                    mp_obj_t dest;
-                    mp_load_method(self->task, MP_QSTR_post, &dest);
-                     const mp_obj_t args[] = {
-                        dest,
-                        MP_OBJ_NEW_QSTR(MP_QSTR_arg),  MP_OBJ_NEW_SMALL_INT(666)
+                    mp_obj_t args[] = {
+                        0, 0,
+                        MP_OBJ_NEW_QSTR(MP_QSTR_arg),  self,
                     };
+                    mp_load_method(self->task, MP_QSTR_post, args);
                     mp_call_method_n_kw(0, 1, args);
                 } else {
                     self->state = DHT_CALL_FAILED;

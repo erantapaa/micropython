@@ -41,12 +41,10 @@
 #include "os_task.h"
 
 
-
-
-STATIC void esp_os_task_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
+STATIC ICACHE_FLASH_ATTR void esp_os_task_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     esp_os_task_obj_t *self = self_in;
 
-    mp_printf(print, "task(callback=%p)", (unsigned int)&self->callback);
+    mp_printf(print, "task(callback=%p arg=%p)", (unsigned int)&self->callback,  (unsigned int)self->arg);
 }
 
 STATIC void task_common_callback(os_event_t *evt) {
@@ -54,7 +52,7 @@ STATIC void task_common_callback(os_event_t *evt) {
     if (self->callback) {
         nlr_buf_t nlr;
         if (nlr_push(&nlr) == 0) {
-            (void)mp_call_function_1(self->callback, self);
+            (void)mp_call_function_2(self->callback, self, self->arg);
         } else {
             mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
         }
@@ -64,7 +62,7 @@ STATIC void task_common_callback(os_event_t *evt) {
 
 STATIC os_event_t sensor_evt_queue[16];
 
-void    esp_os_task_init() {
+void  ICACHE_FLASH_ATTR  esp_os_task_init() {
     system_os_task(task_common_callback, SENSOR_TASK_ID, sensor_evt_queue, sizeof(sensor_evt_queue) / sizeof(*sensor_evt_queue));
     printf("init os_task\n");
 }
@@ -74,7 +72,7 @@ STATIC const mp_arg_t esp_os_task_init_args[] = {
 };
 #define PYB_TASK_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_os_task_init_args)
 
-STATIC mp_obj_t esp_os_task_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_task_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_val_t vals[PYB_TASK_INIT_NUM_ARGS];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, PYB_TASK_INIT_NUM_ARGS, esp_os_task_init_args, vals);
     
@@ -85,21 +83,30 @@ STATIC mp_obj_t esp_os_task_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint
     return (mp_obj_t)self;
 }
 
-/*
-STATIC mp_obj_t esp_os_timer_cancel(mp_obj_t self_in) {
-    esp_os_timer_obj_t *self = self_in;
-    ets_timer_disarm(&self->timer);
-    return mp_const_none;
+ICACHE_FLASH_ATTR void os_task_post(mp_obj_t *callback, mp_obj_t *arg) {
+    esp_os_task_obj_t *tasko = m_new_obj(esp_os_task_obj_t);
+    tasko->base.type = &esp_os_task_type;
+    tasko->callback = callback;
+    tasko->arg = arg;
+    printf("callback is %u arg is %d", (unsigned)callback, (unsigned)arg);
+    system_os_post(SENSOR_TASK_ID, 1, (os_param_t)tasko);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_os_timer_cancel_obj, esp_os_timer_cancel);
-*/
 
-STATIC mp_obj_t esp_os_task_post(mp_obj_t self_in) {
-    esp_os_task_obj_t *self = self_in;
-    system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self);
+STATIC const mp_arg_t esp_os_task_post_args[] = {
+    { MP_QSTR_arg, MP_ARG_KW_ONLY | MP_ARG_OBJ },
+};
+#define ESP_OS_TASK_POST_NUM_ARGS MP_ARRAY_SIZE(esp_os_task_post_args)
+
+STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_task_post(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kw_args) {
+    esp_os_task_obj_t *self = args[0];
+
+    mp_arg_val_t vals[ESP_OS_TASK_POST_NUM_ARGS];
+    mp_arg_parse_all(n_args - 1, args + 1, kw_args, ESP_OS_TASK_POST_NUM_ARGS, esp_os_task_post_args, vals);
+
+    os_task_post(self->callback, vals[0].u_obj);
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_os_task_post_obj, esp_os_task_post);
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(esp_os_task_post_obj, 1, esp_os_task_post);
 
 STATIC const mp_map_elem_t esp_os_task_locals_dict_table[] = {
 //    { MP_OBJ_NEW_QSTR(MP_QSTR_cancel), (mp_obj_t)&esp_os_timer_cancel_obj },
