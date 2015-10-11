@@ -99,6 +99,7 @@ Q(STA_AP_MODE)
 Q(os_task)
 Q(__init__)
 Q(post)
+Q(handler)
 // network module
 Q(network)
 Q(WLAN)
