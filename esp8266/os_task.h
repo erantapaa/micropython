@@ -2,7 +2,7 @@
 #ifndef _INCLUDED_OS_TASK_H_
 #define _INCLUDED_OS_TASK_H_
 
-#define SENSOR_TASK_ID 1
+#define SENSOR_TASK_ID 2
 
 typedef struct _esp_os_task_obj_t {
     mp_obj_base_t base;

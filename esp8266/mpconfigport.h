@@ -40,6 +40,7 @@
 #define MICROPY_MODULE_FROZEN       (1)
 #define MICROPY_PY_URE              (1)
 #define MICROPY_PY_UJSON            (1)
+#define MICROPY_MODULE_BUILTIN_INIT (1)
 
 // type definitions for the specific machine
 

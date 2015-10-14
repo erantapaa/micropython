@@ -253,14 +253,7 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
             self->state = DHT_STATE_ENDED;
             memcpy(self->current, self->bytes, DHT_BYTES);
             if (self->task != mp_const_none) {
-                nlr_buf_t nlr;
-                if (nlr_push(&nlr) == 0) {
-                    mp_obj_t args[2];
-                    mp_load_method(self->task, MP_QSTR_post, args);
-                    mp_call_method_n_kw(0, 0, args);
-                } else {
-                    self->state = DHT_CALL_FAILED;
-                }
+                system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self->task);
             }
             return 0;
         }

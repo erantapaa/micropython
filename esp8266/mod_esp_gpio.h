@@ -54,7 +54,5 @@ extern void ICACHE_FLASH_ATTR esp_gpio_isr_attach(pmap_t *pmp, isr_t vect, void 
 extern bool ICACHE_FLASH_ATTR esp_gpio_isr_detach(uint8_t pin);
 extern void ICACHE_FLASH_ATTR esp_gpio_init();
 
-#define SENSOR_TASK_ID 1
-
 extern const mp_obj_module_t mp_module_esp_gpio;
 #endif // _INCLUDED_MOD_ESP_GPIO_H_
