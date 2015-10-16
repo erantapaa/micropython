@@ -54,7 +54,7 @@
 #include "utils.h"
 #include "mod_esp_gpio.h"
 
-extern void *pvPortMalloc(size_t xWantedSize);
+extern void *pvPortMalloc(size_t xWantedSize, const char *file, const char *line);
 
 #define TIME system_get_time
 
