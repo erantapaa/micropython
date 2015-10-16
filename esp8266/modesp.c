@@ -44,6 +44,7 @@
 #include "os_task.h"
 #include "mod_esp_gpio.h"
 #include "mod_esp_dht.h"
+#include "mod_esp_mutex.h"
 
 STATIC const mp_obj_type_t esp_socket_type;
 
@@ -631,6 +632,7 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_os_task), (mp_obj_t)&esp_os_task_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_gpio), (mp_obj_t)&mp_module_esp_gpio },
     { MP_OBJ_NEW_QSTR(MP_QSTR_dht), (mp_obj_t)&esp_dht_type },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_mutex), (mp_obj_t)&esp_mutex_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR___init__), (mp_obj_t)&esp__init__obj },
 
 #if MODESP_INCLUDE_CONSTANTS

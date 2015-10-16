@@ -173,3 +173,8 @@ Q(arg)
 Q(pin)
 Q(task)
 Q(test)
+
+// mod_esp_mutex
+Q(mutex)
+Q(acquire)
+Q(release)

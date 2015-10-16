@@ -68,6 +68,7 @@ SRC_C = \
 	os_task.c \
 	mod_esp_gpio.c \
 	mod_esp_dht.c \
+	mod_esp_mutex.c \
 	$(BUILD)/frozen.c \
 
 STM_SRC_C = $(addprefix stmhal/,\
