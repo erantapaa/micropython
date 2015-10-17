@@ -44,7 +44,7 @@
 STATIC ICACHE_FLASH_ATTR void mod_esp_mutex_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     esp_mutex_obj_t *self = self_in;
 
-    mp_printf(print, "mutex.value=%d", (unsigned int)&self->mutex);
+    mp_printf(print, "mutex.value=%s", (unsigned int)self->mutex == 0 ? "acquired" : "released");
 }
 
 
@@ -57,7 +57,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_make_new(mp_obj_t type_in, mp_ui
 
 // Richard Antony Burton
 // https://github.com/raburton/esp8266/tree/master/mutex
-bool ICACHE_FLASH_ATTR GetMutex(mutex_t *mutex) {
+bool ICACHE_FLASH_ATTR esp_acquire_mutex(mutex_t *mutex) {
 
     int iOld = 1, iNew = 0;
 
@@ -76,17 +76,28 @@ bool ICACHE_FLASH_ATTR GetMutex(mutex_t *mutex) {
     return (bool)iOld;
 }
 
+void ICACHE_FLASH_ATTR esp_release_mutex(mutex_t *mutex) {
+    *mutex = 1;
+}
+
+void ICACHE_FLASH_ATTR acquire_or_raise(mp_obj_t py_obj_in) {
+    esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)py_obj_in;
+    if (!esp_acquire_mutex(&mutex->mutex)) {
+         nlr_raise(mp_obj_new_exception_msg(&mp_type_Exception, "Unable to acquire mutex"));
+    }
+    return;
+}
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_acquire(mp_obj_t self_in, mp_obj_t len_in) {
-    esp_mutex_obj_t *self = self_in;
-    // TODO: raise on unable
-    return mp_obj_new_int(GetMutex(&self->mutex));
+    acquire_or_raise(self_in);
+    return mp_obj_new_bool(1);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_mutex_acquire_obj, mod_esp_mutex_acquire);
 
 STATIC mp_obj_t mod_esp_mutex_release(mp_obj_t self_in, mp_obj_t lambda_in) {
     esp_mutex_obj_t *self = self_in;
-    self->mutex = 1;
+
+    esp_release_mutex(&self->mutex);
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_mutex_release_obj, mod_esp_mutex_release);

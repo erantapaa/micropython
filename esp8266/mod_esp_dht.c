@@ -3,8 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2013, 2014 Damien P. George
- * Copyright (c) 2014 Paul Sokolovsky
+ * Copyright (c) 2015 Rob Fowler
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -56,6 +55,7 @@
 #include "mod_esp_gpio.h"
 #include "mod_esp_dht.h"
 #include "os_task.h"
+#include "mod_esp_mutex.h"
 
 
 #define TIME system_get_time
@@ -91,6 +91,8 @@ typedef struct _mp_obj_dht_t {
     uint8_t bytes[DHT_BYTES];
     uint8_t current[DHT_BYTES];
     mp_obj_t task;
+    mp_obj_t mutex;
+    uint32_t mutex_fail_count;
 } mp_obj_dht_t;
 
 //TODO make a class to pass the final result
@@ -116,6 +118,7 @@ STATIC void    ICACHE_FLASH_ATTR dhtx_reset_values(mp_obj_dht_t *self) {
     self->state = DHT_STATE_NEW;
     self->error = "None";
     self->last_read_time = 0;
+    self->mutex_fail_count = 0;
     memset(self->bytes, 0, DHT_BYTES);
 }
 
@@ -125,8 +128,10 @@ STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
     mp_obj_dht_t *dhto = m_new_obj(mp_obj_dht_t);
     dhto->base.type = &esp_dht_type;
     dhto->pmp = pmp;
+    dhto->task = mp_const_none;
+    dhto->mutex = mp_const_none;
     dhtx_reset_values(dhto);
-    esp_gpio_isr_attach(pmp, dhtx, dhto, 50);
+    esp_gpio_isr_attach(pmp, dhtx, dhto, 50); // 50 events
     return dhto;
 }
 
@@ -144,12 +149,20 @@ STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
 STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     (void)kind;
     mp_obj_dht_t *self = self_in;
-        mp_printf(print, "<_dht %d %s inters %d bits %d task %x>\n",
+    const char *mvalue = "None";
+
+    if (self->mutex != mp_const_none) {
+        esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
+        mvalue = mutex->mutex  == 0 ? "acquired" : "released";
+    }
+    mp_printf(print, "<_dht %d %s inters %d bits %d task %x fails %d mutex %s>\n",
             self->state,
             self->error,
             self->inters,
             self->bits,
-            (unsigned)&self->task);
+            (unsigned)&self->task,
+            self->mutex_fail_count, 
+            mvalue);
     for (int ii = 0; ii < DHT_BYTES; ii++) {
         printf("%d,\'%2x\',%u,\'"BYTETOBINARYPATTERN"\'\n", ii, self->bytes[ii], self->bytes[ii], BYTETOBINARY(self->bytes[ii]));
     }
@@ -161,6 +174,7 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
 STATIC const mp_arg_t esp_dht_init_args[] = {
     { MP_QSTR_pin, MP_ARG_REQUIRED | MP_ARG_INT },
     { MP_QSTR_task, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
+    { MP_QSTR_mutex, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
 };
 #define ESP_DHT_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_dht_init_args)
 
@@ -178,6 +192,13 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
             self->task = vals[1].u_obj;
         } else {
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "task needs to be an esp.os_task type"));
+        }
+    } 
+    if (vals[2].u_obj != mp_const_none) {
+        if (MP_OBJ_IS_TYPE(vals[2].u_obj, &esp_mutex_type)) {
+            self->mutex = vals[2].u_obj;
+        } else {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "mutex needs to be an esp.mutex type"));
         }
     } 
     // TODO: move these to the esp_gpio module
@@ -251,7 +272,19 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
         }
         if (self->bits == 40) {
             self->state = DHT_STATE_ENDED;
+            // aquire mutex if one was provided
+            if (self->mutex != mp_const_none) {
+                esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
+                if (!esp_acquire_mutex(&mutex->mutex)) {
+                    self->mutex_fail_count++;
+                    return 0;
+                }
+            } 
             memcpy(self->current, self->bytes, DHT_BYTES);
+            if (self->mutex != mp_const_none) {
+                esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
+                esp_release_mutex(&mutex->mutex);
+            }
             if (self->task != mp_const_none) {
                 system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self->task);
             }
@@ -296,8 +329,17 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_state_obj, mod_esp_dht_state);
 STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_values(mp_obj_t self_in, mp_obj_t len_in) {
     mp_obj_dht_t *self = self_in;
     mp_obj_t tuple[DHT_BYTES];
-    for (int ii = 0; ii < DHT_BYTES; ii++)
+    
+    if (self->mutex != mp_const_none) {
+        acquire_or_raise(self->mutex);
+    }
+    for (int ii = 0; ii < DHT_BYTES; ii++) {
         tuple[ii] = mp_obj_new_int(self->current[ii]);
+    }
+    if (self->mutex != mp_const_none) {
+        esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
+        esp_release_mutex(&mutex->mutex);
+    }
     return mp_obj_new_tuple(DHT_BYTES, tuple);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_values_obj, mod_esp_dht_values);
@@ -315,7 +357,7 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t l
     GPIO_OUTPUT_SET(self->pmp->pin, 0);
     self->state = DHT_STATE_HPL;
     self->last_read_time = system_get_time() / 1000;
-#if 0
+#if 1
     os_delay_us(1000);
     dht_host_up(self);
 #else
@@ -329,20 +371,14 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_recv_obj, mod_esp_dht_recv);
 STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_test(mp_obj_t self_in, mp_obj_t len_in) {
     printf("test call\n");
     mp_obj_dht_t *self = self_in;
-    if (self->task != mp_const_none) {
-        if (MP_OBJ_IS_TYPE(self->task, &esp_os_task_type)) {
-            printf("is task\n");
-        } else {
-            printf("is not task\n");
+    if (self->mutex != mp_const_none) {
+        esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
+        printf("mutex value is %d\n", mutex->mutex);
+        if (!esp_acquire_mutex(&mutex->mutex)) {
+            printf("Failed acquire\n");
+            return mp_const_none;
         }
-        nlr_buf_t nlr;
-        if (nlr_push(&nlr) == 0) {
-            mp_obj_t dest[2];
-            mp_load_method(self->task, MP_QSTR_post, dest);
-            mp_call_method_n_kw(0, 0, dest);
-        } else {
-            mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
-        }
+        esp_release_mutex(&mutex->mutex);
     }
     return mp_const_none;
 }
