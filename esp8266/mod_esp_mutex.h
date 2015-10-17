@@ -7,6 +7,7 @@ typedef int32 mutex_t;
 typedef struct _esp_mutex_obj_t {
     mp_obj_base_t base;
     mutex_t mutex;
+    uint32_t spin_time;
 } esp_mutex_obj_t;
 
 extern const mp_obj_type_t esp_mutex_type;

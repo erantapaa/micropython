@@ -40,22 +40,37 @@
 
 #include "mod_esp_mutex.h"
 
+extern unsigned xthal_get_ccount(void);
+extern unsigned ets_get_cpu_frequency();
 
 STATIC ICACHE_FLASH_ATTR void mod_esp_mutex_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     esp_mutex_obj_t *self = self_in;
 
-    mp_printf(print, "mutex.value=%s", (unsigned int)self->mutex == 0 ? "acquired" : "released");
+    mp_printf(print, "mutex.value=%s mutex.spin_time=%u", (unsigned int)self->mutex == 0 ? "acquired" : "released", self->spin_time);
 }
 
 
+///
+
+
+STATIC const mp_arg_t mod_esp_mutex_init_args[] = {
+    { MP_QSTR_spin_time, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 0} },
+};
+#define ESP_MUTEX_INIT_NUM_ARGS MP_ARRAY_SIZE(mod_esp_mutex_init_args)
+
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    mp_arg_val_t vals[ESP_MUTEX_INIT_NUM_ARGS];
+    mp_arg_parse_all_kw_array(n_args, n_kw, args, ESP_MUTEX_INIT_NUM_ARGS, mod_esp_mutex_init_args, vals);
+
     esp_mutex_obj_t *self = m_new_obj(esp_mutex_obj_t);
     self->base.type = &esp_mutex_type;
     self->mutex = 1;
+    self->spin_time = vals[0].u_int;
     return (mp_obj_t)self;
 }
 
-// Richard Antony Burton
+
+// mutex by Richard Antony Burton
 // https://github.com/raburton/esp8266/tree/master/mutex
 bool ICACHE_FLASH_ATTR esp_acquire_mutex(mutex_t *mutex) {
 
@@ -82,10 +97,21 @@ void ICACHE_FLASH_ATTR esp_release_mutex(mutex_t *mutex) {
 
 void ICACHE_FLASH_ATTR acquire_or_raise(mp_obj_t py_obj_in) {
     esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)py_obj_in;
-    if (!esp_acquire_mutex(&mutex->mutex)) {
-         nlr_raise(mp_obj_new_exception_msg(&mp_type_Exception, "Unable to acquire mutex"));
+
+    if (esp_acquire_mutex(&mutex->mutex)) {
+        return;
     }
-    return;
+    if (mutex->spin_time) {
+        uint32_t count0 = xthal_get_ccount(); 
+        uint32_t delayCount = mutex->spin_time * ets_get_cpu_frequency();
+        printf("delay %u count %u\n", mutex->spin_time, delayCount);
+        while (xthal_get_ccount() - count0 < delayCount) {
+            if (esp_acquire_mutex(&mutex->mutex)) {
+                return;
+            }
+         }
+    }
+    nlr_raise(mp_obj_new_exception_msg(&mp_type_Exception, "Unable to acquire mutex"));
 }
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_acquire(mp_obj_t self_in, mp_obj_t len_in) {
