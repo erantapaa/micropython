@@ -104,7 +104,6 @@ void ICACHE_FLASH_ATTR acquire_or_raise(mp_obj_t py_obj_in) {
     if (mutex->spin_time) {
         uint32_t count0 = xthal_get_ccount(); 
         uint32_t delayCount = mutex->spin_time * ets_get_cpu_frequency();
-        printf("delay %u count %u\n", mutex->spin_time, delayCount);
         while (xthal_get_ccount() - count0 < delayCount) {
             if (esp_acquire_mutex(&mutex->mutex)) {
                 return;
@@ -129,7 +128,6 @@ STATIC mp_obj_t mod_esp_mutex_release(mp_obj_t self_in, mp_obj_t lambda_in) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_mutex_release_obj, mod_esp_mutex_release);
 
 STATIC const mp_map_elem_t mod_esp_mutex_locals_dict_table[] = {
-//    { MP_OBJ_NEW_QSTR(MP_QSTR_cancel), (mp_obj_t)&esp_os_timer_cancel_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_acquire), (mp_obj_t)&mod_esp_mutex_acquire_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_release), (mp_obj_t)&mod_esp_mutex_release_obj },
 };

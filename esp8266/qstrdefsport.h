@@ -172,6 +172,7 @@ Q(dht)
 Q(arg)
 Q(pin)
 Q(task)
+Q(spinwait)
 Q(test)
 
 // mod_esp_mutex

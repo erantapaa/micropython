@@ -93,6 +93,7 @@ typedef struct _mp_obj_dht_t {
     mp_obj_t task;
     mp_obj_t mutex;
     uint32_t mutex_fail_count;
+    bool spinwait;
 } mp_obj_dht_t;
 
 //TODO make a class to pass the final result
@@ -155,14 +156,15 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
         esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
         mvalue = mutex->mutex  == 0 ? "acquired" : "released";
     }
-    mp_printf(print, "<_dht %d %s inters %d bits %d task %x fails %d mutex %s>\n",
+    mp_printf(print, "class_dht %d %s inters=%d,bits=%d,task=%x,fails=%d,mutex=%s,spinwait=%s>\n",
             self->state,
             self->error,
             self->inters,
             self->bits,
             (unsigned)&self->task,
             self->mutex_fail_count, 
-            mvalue);
+            mvalue,
+            self->spinwait ? "True" : "False");
     for (int ii = 0; ii < DHT_BYTES; ii++) {
         printf("%d,\'%2x\',%u,\'"BYTETOBINARYPATTERN"\'\n", ii, self->bytes[ii], self->bytes[ii], BYTETOBINARY(self->bytes[ii]));
     }
@@ -175,6 +177,7 @@ STATIC const mp_arg_t esp_dht_init_args[] = {
     { MP_QSTR_pin, MP_ARG_REQUIRED | MP_ARG_INT },
     { MP_QSTR_task, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
     { MP_QSTR_mutex, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
+    { MP_QSTR_spinwait, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false} }
 };
 #define ESP_DHT_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_dht_init_args)
 
@@ -201,6 +204,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "mutex needs to be an esp.mutex type"));
         }
     } 
+    self->spinwait = vals[3].u_bool;
     // TODO: move these to the esp_gpio module
     GPIO_REG_WRITE(GPIO_ENABLE_W1TS_ADDRESS, (1<<gpio_pin));
     gpio_pin_intr_state_set(GPIO_ID_PIN(pmp->pin), GPIO_PIN_INTR_ANYEDGE);  
@@ -277,7 +281,7 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
                 esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
                 if (!esp_acquire_mutex(&mutex->mutex)) {
                     self->mutex_fail_count++;
-                    return 0;
+                    return 1;
                 }
             } 
             memcpy(self->current, self->bytes, DHT_BYTES);
@@ -357,13 +361,13 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t l
     GPIO_OUTPUT_SET(self->pmp->pin, 0);
     self->state = DHT_STATE_HPL;
     self->last_read_time = system_get_time() / 1000;
-#if 1
-    os_delay_us(1000);
-    dht_host_up(self);
-#else
-    os_timer_setfn(&self->timer, dht_host_up, self);
-    os_timer_arm(&self->timer, 1, 1);
-#endif
+    if (self->spinwait) {
+        os_delay_us(1000);
+        dht_host_up(self);
+    } else {
+        os_timer_setfn(&self->timer, dht_host_up, self);
+        os_timer_arm(&self->timer, 1, 1);
+    }
     return mp_obj_new_int(0);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_recv_obj, mod_esp_dht_recv);
