@@ -174,6 +174,7 @@ Q(pin)
 Q(task)
 Q(spinwait)
 Q(test)
+Q(consume)
 
 // mod_esp_mutex
 Q(mutex)

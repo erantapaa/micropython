@@ -86,14 +86,15 @@ typedef struct _mp_obj_dht_t {
     os_timer_t timer;
     uint32_t start;
     uint32_t inters;
-    uint32_t last_read_time;
+    uint32_t last_read_time;    // last read time used to time the interrupts
     uint16_t bits;
     uint8_t bytes[DHT_BYTES];
     uint8_t current[DHT_BYTES];
     mp_obj_t task;
     mp_obj_t mutex;
     uint32_t mutex_fail_count;
-    bool spinwait;
+    bool spinwait;      // uSeconds to spin waiting for the mutex to unlock. Not used in the sender.
+    bool filled;        // data is available
 } mp_obj_dht_t;
 
 //TODO make a class to pass the final result
@@ -131,6 +132,7 @@ STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
     dhto->pmp = pmp;
     dhto->task = mp_const_none;
     dhto->mutex = mp_const_none;
+    dhto->filled = false;
     dhtx_reset_values(dhto);
     esp_gpio_isr_attach(pmp, dhtx, dhto, 50); // 50 events
     return dhto;
@@ -156,7 +158,7 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
         esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
         mvalue = mutex->mutex  == 0 ? "acquired" : "released";
     }
-    mp_printf(print, "class_dht %d %s inters=%d,bits=%d,task=%x,fails=%d,mutex=%s,spinwait=%s>\n",
+    mp_printf(print, "class_dht %d %s inters=%d,bits=%d,task=%x,fails=%d,mutex=%s,spinwait=%s,filled=%s>\n",
             self->state,
             self->error,
             self->inters,
@@ -164,7 +166,9 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
             (unsigned)&self->task,
             self->mutex_fail_count, 
             mvalue,
-            self->spinwait ? "True" : "False");
+            self->spinwait ? "True" : "False",
+            self->filled ? "True" : "False");
+
     for (int ii = 0; ii < DHT_BYTES; ii++) {
         printf("%d,\'%2x\',%u,\'"BYTETOBINARYPATTERN"\'\n", ii, self->bytes[ii], self->bytes[ii], BYTETOBINARY(self->bytes[ii]));
     }
@@ -213,7 +217,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
 }
 
 
-// don't try macros like this at home :)
+// don't try macros like this at home 
 #define  dht_error(dht, error_str) dht->error = error_str, dht->state = DHT_ERROR; return -1
 
 
@@ -285,6 +289,7 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
                 }
             } 
             memcpy(self->current, self->bytes, DHT_BYTES);
+            self->filled = true;
             if (self->mutex != mp_const_none) {
                 esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
                 esp_release_mutex(&mutex->mutex);
@@ -330,32 +335,71 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_state(mp_obj_t self_in, mp_obj_t l
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_state_obj, mod_esp_dht_state);
 
 
-STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_values(mp_obj_t self_in, mp_obj_t len_in) {
-    mp_obj_dht_t *self = self_in;
+// TODO: add kwarg to clear old values. If clear old is set there is no value 
+// then return None? or exception?
+// for name,sensor in sensors.items():
+//      blah[name] = sesnsor.values(consume=True)
+//
+#if 0
+has to be this anyway for a mutex failing to acquire
+for name,sensor in sensors.items():
+    try:
+        blah[name] = sensor.values(consume=True)
+    except // can be mutex fail or no value
+        continue
+#endif
+
+
+/// \method values([consume])
+/// consume: if true then mark this reading as consumed
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_dht_values(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+    STATIC const mp_arg_t dht_values_args[] = {
+        { MP_QSTR_consume, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false}}
+    };
+
+    mp_obj_dht_t *self = args[0];
+
+    mp_arg_val_t arg_vals[MP_ARRAY_SIZE(dht_values_args)];
+    mp_arg_parse_all(n_args - 1, args + 1, kwargs, MP_ARRAY_SIZE(dht_values_args), dht_values_args, arg_vals);
+
+    bool consume = arg_vals[0].u_bool;
+
     mp_obj_t tuple[DHT_BYTES];
     
     if (self->mutex != mp_const_none) {
         acquire_or_raise(self->mutex);
     }
-    for (int ii = 0; ii < DHT_BYTES; ii++) {
-        tuple[ii] = mp_obj_new_int(self->current[ii]);
+    bool got_values = false;
+
+    if (self->filled == true) {
+        for (int ii = 0; ii < DHT_BYTES; ii++) {
+            tuple[ii] = mp_obj_new_int(self->current[ii]);
+        }
+        if (consume == true) {
+            self->filled = false;
+            printf("setting fileld to false\n");
+        }
+        got_values = true;
     }
     if (self->mutex != mp_const_none) {
         esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
         esp_release_mutex(&mutex->mutex);
     }
+    if (!got_values) {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_LookupError, "No data"));
+    }
     return mp_obj_new_tuple(DHT_BYTES, tuple);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_values_obj, mod_esp_dht_values);
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_esp_dht_values_obj, 1, mod_esp_dht_values);
 
-#define READ_WAIT 2000
+#define MIN_DHT_CYCLE_TIME 2000
 
 STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t len_in) {
     mp_obj_dht_t *self = self_in;
 
     uint32_t elapsed =  (system_get_time() / 1000 - self->last_read_time);
-    if (elapsed < READ_WAIT) {
-        return mp_obj_new_int(READ_WAIT - elapsed);   // call back in 2 seconds
+    if (elapsed < MIN_DHT_CYCLE_TIME) {
+        return mp_obj_new_int(MIN_DHT_CYCLE_TIME - elapsed);   // call back in 2 seconds
     }
     dhtx_reset_values(self);        // TODO: to esp_gpio
     GPIO_OUTPUT_SET(self->pmp->pin, 0);
@@ -373,7 +417,6 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t l
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_recv_obj, mod_esp_dht_recv);
 
 STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_test(mp_obj_t self_in, mp_obj_t len_in) {
-    printf("test call\n");
     mp_obj_dht_t *self = self_in;
     if (self->mutex != mp_const_none) {
         esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
