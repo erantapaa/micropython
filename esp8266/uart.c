@@ -95,7 +95,7 @@ static void ICACHE_FLASH_ATTR uart_config(uint8 uart_no) {
  * Parameters   : uint8 TxChar - character to tx
  * Returns      : OK
 *******************************************************************************/
-void uart_tx_one_char(uint8 uart, uint8 TxChar) {
+void ICACHE_FLASH_ATTR uart_tx_one_char(uint8 uart, uint8 TxChar) {
     while (true) {
         uint32 fifo_cnt = READ_PERI_REG(UART_STATUS(uart)) & (UART_TXFIFO_CNT<<UART_TXFIFO_CNT_S);
         if ((fifo_cnt >> UART_TXFIFO_CNT_S & UART_TXFIFO_CNT) < 126) {
@@ -164,7 +164,7 @@ static void uart0_rx_intr_handler(void *para) {
     }
 }
 
-int uart0_rx(void) {
+int ICACHE_FLASH_ATTR uart0_rx(void) {
   if (rx_buf_out != rx_buf_in) {
       int chr = rx_buf[rx_buf_out];
       rx_buf_out = (rx_buf_out + 1) % RX_BUF_SIZE;
@@ -174,7 +174,7 @@ int uart0_rx(void) {
   }
 }
 
-int uart_rx_one_char(uint8 uart_no) {
+int ICACHE_FLASH_ATTR uart_rx_one_char(uint8 uart_no) {
     if (READ_PERI_REG(UART_STATUS(uart_no)) & (UART_RXFIFO_CNT << UART_RXFIFO_CNT_S)) {
         return READ_PERI_REG(UART_FIFO(uart_no)) & 0xff;
     }
@@ -211,7 +211,7 @@ void ICACHE_FLASH_ATTR uart_reattach() {
 
 void soft_reset(void);
 
-void uart_task_handler(os_event_t *evt) {
+void ICACHE_FLASH_ATTR uart_task_handler(os_event_t *evt) {
     int c, ret = 0;
     while ((c = uart_rx_one_char(UART_REPL)) >= 0) {
         ret = pyexec_event_repl_process_char(c);
@@ -230,6 +230,6 @@ void uart_task_handler(os_event_t *evt) {
     }
 }
 
-void uart_task_init() {
+void ICACHE_FLASH_ATTR uart_task_init() {
     system_os_task(uart_task_handler, UART_TASK_ID, uart_evt_queue, sizeof(uart_evt_queue) / sizeof(*uart_evt_queue));
 }

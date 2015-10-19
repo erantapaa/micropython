@@ -193,7 +193,7 @@ STATIC void esp_socket_disconnect_callback(void *arg) {
     if (s->cb_disconnect != mp_const_none) {
         call_function_1_protected(s->cb_disconnect, s);
     }
-    //esp_socket_close(s);
+    esp_socket_close(s);
 }
 
 STATIC void esp_socket_reconnect_callback(void *arg, sint8 err) {

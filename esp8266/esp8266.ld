@@ -91,6 +91,12 @@ SECTIONS
         *modpybrtc.o(.literal*, .text*)
         *modesp.o(.literal* .text*)
         *modutime.o(.literal* .text*)
+        *modnetwork.o(.literal* .text*)
+        *modpybadc.o(.literal* .text*)
+        *moduos.o(.literal* .text*)
+        *strtoll.o(.literal* .text*)
+        *utils.o(.literal* .text*)
+        /* *extmod/*.o(.literal* .text*)  */
 
         /* we put as much rodata as possible in this section */
         /* note that only rodata accessed as a machine word is allowed here */

@@ -41,7 +41,7 @@
 
 STATIC char heap[16384];
 
-STATIC void mp_reset(void) {
+STATIC void  ICACHE_FLASH_ATTR mp_reset(void) {
     mp_stack_set_limit(10240);
     mp_hal_init();
     gc_init(heap, heap + sizeof(heap));
@@ -54,33 +54,33 @@ STATIC void mp_reset(void) {
 #endif
 }
 
-void soft_reset(void) {
+void ICACHE_FLASH_ATTR soft_reset(void) {
     mp_hal_stdout_tx_str("PYB: soft reset\r\n");
     mp_hal_udelay(10000); // allow UART to flush output
     mp_reset();
     pyexec_event_repl_init();
 }
 
-void init_done(void) {
+void ICACHE_FLASH_ATTR init_done(void) {
     mp_reset();
     mp_hal_stdout_tx_str("\r\n");
     pyexec_event_repl_init();
     uart_task_init();
 }
 
-void user_init(void) {
+void ICACHE_FLASH_ATTR user_init(void) {
     system_init_done_cb(init_done);
 }
 
-mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
+mp_lexer_t ICACHE_FLASH_ATTR *mp_lexer_new_from_file(const char *filename) {
     return NULL;
 }
 
-mp_import_stat_t mp_import_stat(const char *path) {
+mp_import_stat_t ICACHE_FLASH_ATTR  mp_import_stat(const char *path) {
     return MP_IMPORT_STAT_NO_EXIST;
 }
 
-mp_obj_t mp_builtin_open(uint n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+mp_obj_t ICACHE_FLASH_ATTR  mp_builtin_open(uint n_args, const mp_obj_t *args, mp_map_t *kwargs) {
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(mp_builtin_open_obj, 1, mp_builtin_open);

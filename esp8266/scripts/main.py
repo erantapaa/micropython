@@ -20,20 +20,32 @@ def socket_recv(self, sock, data):
 
         else:
             self.last = ujson.loads(ii)
+            sock.close()
 
+# todo how to sent multiple blocks when we need to wait?
+def send_data(self):
+    if self.what:
+        print("send %d" % self.soc.send(self.make_post('/', self.what)))
+        self.what = dict()
 
-def on_connect(self, sock):
-    self.soc.send(self.make_post('/', self.what))
+def reconnect(self):
+    print("reconnect")
+
+def disconnected(socky):
+    print("Disconnected")
 
 
 class Socky:
     def __init__(self, host, port):
+        self.what = dict()
         self.host = host
         self.port = port
         self.last = None
         self.soc = esp.socket()
-        self.soc.onconnect(lambda sock: on_connect(self, sock))
+        self.soc.onconnect(lambda sock: send_data(self))
+        self.soc.onreconnect(lambda sock: reconnect(self))
         self.soc.onrecv(lambda sock, data: socket_recv(self, sock, data))
+        self.soc.ondisconnect(lambda sock: disconnected(self))
 
     def make_post(self, url, data):
         method = 'POST %s HTTP/1.1\r\n' % url
@@ -44,17 +56,20 @@ class Socky:
         to_send = method + '\r\n'.join("%s: %s" % (field, value) for field, value in headers.items())
         to_send += '\r\n\r\n'
         to_send += data_as_text
+        print("sending  '%s'" % data_as_text)
         return to_send
 
     def state(self):
         return self.soc.state()
 
     def send(self, what):
-        self.what = what
+        self.what.update(what)
+        print("send state %d" % self.state())
         if self.state() in [esp.ESPCONN_CLOSE, esp.ESPCONN_NONE]:
+            print("Connect")
             self.soc.connect((self.host, self.port))
         else:
-            self.soc.send(self.make_post('/', self.what))
+            send_data(self)
 
 
 def network_init(ap, password, dest_ip, dest_port):
@@ -65,19 +80,11 @@ def network_init(ap, password, dest_ip, dest_port):
     return Socky(dest_ip, dest_port)
 
 
-def receiver(timer, sensor):
-    print("'%s' " % sensor.name)
-    print("before")
-    print(sensor.dht)
-    sensor.dht.recv()
-    pyb.udelay(10000)
-    print(sensor.dht)
-
 class Sensor:
     def __init__(self, name, port, period, task=None, mutex=None):
         self.name = name
         self.dht = esp.dht(port, task=task, mutex=mutex, spinwait=True)
-        self.timer = esp.os_timer(lambda timer: receiver(timer, self), period=period)
+        self.timer = esp.os_timer(lambda timer: self.dht.recv(), period=period)
 
     @staticmethod
     def sensor_tuple_to_temp_hum(stuple):
@@ -99,7 +106,7 @@ def handler(task, server, sensors_manager):
             temp, hum = sensor.get()
             temps[name] = {'temp': temp, 'hum': hum}
         except Exception as ee:
-            continue       
+            continue      
     if temps:
         server.send(temps)
 
@@ -111,7 +118,7 @@ class SensorsManager:
         self.sensors = dict()
         self.task = esp.os_task(callback=lambda task: handler(task, srv, self))
         for sensor_name, sensor_port in sensor_table.items():
-            self.sensors[sensor_name] = Sensor(sensor_name, sensor_port, 4000, task=self.task, mutex=self.mutex)
+            self.sensors[sensor_name] = Sensor(sensor_name, sensor_port, 10000, task=self.task, mutex=self.mutex)
             pyb.udelay(10000)
 
 

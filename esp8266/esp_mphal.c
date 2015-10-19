@@ -36,23 +36,23 @@ extern void ets_wdt_enable(void);
 extern void wdt_feed(void);
 extern void ets_delay_us();
 
-void mp_hal_init(void) {
+void ICACHE_FLASH_ATTR mp_hal_init(void) {
     // ets_wdt_disable(); // it's a pain while developing
     ets_wdt_enable(); 
     uart_init(UART_BIT_RATE_115200, UART_BIT_RATE_115200);
 }
 
-void mp_hal_feed_watchdog(void) {
+void ICACHE_FLASH_ATTR mp_hal_feed_watchdog(void) {
     //ets_wdt_disable(); // it's a pain while developing
     //WRITE_PERI_REG(0x60000914, 0x73);
     //wdt_feed(); // might also work
 }
 
-void mp_hal_udelay(uint32_t us) {
+void ICACHE_FLASH_ATTR mp_hal_udelay(uint32_t us) {
     ets_delay_us(us);
 }
 
-int mp_hal_stdin_rx_chr(void) {
+int ICACHE_FLASH_ATTR mp_hal_stdin_rx_chr(void) {
     for (;;) {
         int c = uart0_rx();
         if (c != -1) {
@@ -63,19 +63,19 @@ int mp_hal_stdin_rx_chr(void) {
     }
 }
 
-void mp_hal_stdout_tx_str(const char *str) {
+void ICACHE_FLASH_ATTR mp_hal_stdout_tx_str(const char *str) {
     while (*str) {
         uart_tx_one_char(UART0, *str++);
     }
 }
 
-void mp_hal_stdout_tx_strn(const char *str, uint32_t len) {
+void ICACHE_FLASH_ATTR mp_hal_stdout_tx_strn(const char *str, uint32_t len) {
     while (len--) {
         uart_tx_one_char(UART0, *str++);
     }
 }
 
-void mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len) {
+void ICACHE_FLASH_ATTR mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len) {
     while (len--) {
         if (*str == '\n') {
             uart_tx_one_char(UART0, '\r');
@@ -84,14 +84,14 @@ void mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t len) {
     }
 }
 
-uint32_t HAL_GetTick(void) {
+uint32_t ICACHE_FLASH_ATTR HAL_GetTick(void) {
     return system_get_time() / 1000;
 }
 
-void HAL_Delay(uint32_t Delay) {
+void ICACHE_FLASH_ATTR HAL_Delay(uint32_t Delay) {
     mp_hal_udelay(Delay * 1000);
 }
 
-void mp_hal_set_interrupt_char(int c) {
+void ICACHE_FLASH_ATTR mp_hal_set_interrupt_char(int c) {
     // TODO
 }
