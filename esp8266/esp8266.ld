@@ -96,7 +96,7 @@ SECTIONS
         *moduos.o(.literal* .text*)
         *strtoll.o(.literal* .text*)
         *utils.o(.literal* .text*)
-        /* *extmod/*.o(.literal* .text*)  */
+        *printf.o(.literal* .text*)
 
         /* we put as much rodata as possible in this section */
         /* note that only rodata accessed as a machine word is allowed here */
