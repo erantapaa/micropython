@@ -51,7 +51,7 @@ typedef struct _esp_os_timer_obj_t {
 } esp_os_timer_obj_t;
 
 
-STATIC void esp_os_timer_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
+STATIC ICACHE_FLASH_ATTR void esp_os_timer_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     esp_os_timer_obj_t *self = self_in;
 
     mp_printf(print, "timer(callback=%p, period=%u, repeat=%s)", 
@@ -60,7 +60,7 @@ STATIC void esp_os_timer_print(const mp_print_t *print, mp_obj_t self_in, mp_pri
         self->repeat ? "True" : "False");
 }
 
-STATIC void timer_common_callback(void *parg) {
+STATIC ICACHE_FLASH_ATTR void timer_common_callback(void *parg) {
     esp_os_timer_obj_t *self = (esp_os_timer_obj_t *)parg;
     if (self->callback) {
         nlr_buf_t nlr;
@@ -80,7 +80,7 @@ STATIC const mp_arg_t esp_os_timer_init_args[] = {
 };
 #define PYB_TIMER_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_os_timer_init_args)
 
-STATIC mp_obj_t esp_os_timer_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_timer_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_val_t vals[PYB_TIMER_INIT_NUM_ARGS];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, PYB_TIMER_INIT_NUM_ARGS, esp_os_timer_init_args, vals);
     
@@ -99,7 +99,7 @@ STATIC mp_obj_t esp_os_timer_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uin
     return (mp_obj_t)self;
 }
 
-STATIC mp_obj_t esp_os_timer_cancel(mp_obj_t self_in) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_timer_cancel(mp_obj_t self_in) {
     esp_os_timer_obj_t *self = self_in;
     ets_timer_disarm(&self->timer);
     return mp_const_none;

@@ -119,9 +119,8 @@ STATIC void def_isr(void *arg)
     }
 }
 
-void esp_gpio_init() {
+void ICACHE_FLASH_ATTR esp_gpio_init() {
     ETS_GPIO_INTR_ATTACH(def_isr, NULL);
-    printf("mod_esp_gpio\n");
 }
 
 STATIC mp_obj_t ICACHE_FLASH_ATTR esp_gpio_print(mp_obj_t self_in, mp_obj_t len_in) {
@@ -136,8 +135,6 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR esp_gpio_print(mp_obj_t self_in, mp_obj_t len_
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_gpio_print_obj, esp_gpio_print);
-
-
 
 
 bool ICACHE_FLASH_ATTR esp_gpio_isr_detach(uint8_t pin)

@@ -1,4 +1,5 @@
 # This script is run on boot
+import gc
 import esp, network, re
 import ujson
 import pyb
@@ -56,17 +57,6 @@ class Socky:
             self.soc.send(self.make_post('/', self.what))
 
 
-def handler(task, server, dht, label):
-    (hum_hi, hum_low, temp_hi, temp_low, checksum) = dht.values()
-    calculated = (hum_hi + hum_low + temp_hi + temp_low) & 0xFF
-    if calculated != checksum:
-        print("wrong checksum %d %d" % (calculated, checksum))
-        return
-    temp = temp_hi * 256 + temp_low
-    hum = hum_hi * 256 + hum_low
-    server.send({'temp': temp, 'hum': hum, 'label': label})
-
-
 def network_init(ap, password, dest_ip, dest_port):
     if esp.wifi_mode() != esp.STA_MODE:
         esp.wifi_mode(esp.STA_MODE)
@@ -75,43 +65,58 @@ def network_init(ap, password, dest_ip, dest_port):
     return Socky(dest_ip, dest_port)
 
 
-class sensor:
-    def __init__(self, srv, name, port, period, mutex=None):
-        self.srv = srv
+def receiver(timer, sensor):
+    print("'%s' " % sensor.name)
+    print("before")
+    print(sensor.dht)
+    sensor.dht.recv()
+    pyb.udelay(10000)
+    print(sensor.dht)
+
+class Sensor:
+    def __init__(self, name, port, period, task=None, mutex=None):
         self.name = name
-        self.port = port
-        self.task = esp.os_task()
-        self.dht = esp.dht(port, task=self.task, mutex=mutex)
-        self.task.handler(lambda task: handler(task, self.srv, self.dht, self.name))
-        self.timer = esp.os_timer(lambda timer: self.dht.recv(), period=period)
+        self.dht = esp.dht(port, task=task, mutex=mutex, spinwait=True)
+        self.timer = esp.os_timer(lambda timer: receiver(timer, self), period=period)
+
+    @staticmethod
+    def sensor_tuple_to_temp_hum(stuple):
+        (hum_hi, hum_low, temp_hi, temp_low, checksum) = stuple
+        calculated = (hum_hi + hum_low + temp_hi + temp_low) & 0xFF
+        if calculated != checksum:
+            raise ValueError("wrong checksum %d %d" % (calculated, checksum))
+        # TODO: extra logic for negative (never going to happen in Sydney)
+        return temp_hi * 256 + temp_low, hum_hi * 256 + hum_low
+
+    def get(self):
+        return self.sensor_tuple_to_temp_hum(self.dht.values(consume=True))
 
 
-def init_temp_sensors(srv, mutex, sensor_names):
-    sensors = list()
-    for sensor_name, port in sensor_names.items():
-        sensors.append(sensor(srv, sensor_name, port, 4000, mutex=mutex))
-    return sensors
+def handler(task, server, sensors_manager):
+    temps = dict()
+    for name, sensor in sensors_manager.sensors.items():
+        try:
+            temp, hum = sensor.get()
+            temps[name] = {'temp': temp, 'hum': hum}
+        except Exception as ee:
+            continue       
+    if temps:
+        server.send(temps)
+
+
+class SensorsManager:
+    def __init__(self, sensor_table, srv):
+        self.mutex = esp.mutex()
+        self.sensor_table = sensor_table
+        self.sensors = dict()
+        self.task = esp.os_task(callback=lambda task: handler(task, srv, self))
+        for sensor_name, sensor_port in sensor_table.items():
+            self.sensors[sensor_name] = Sensor(sensor_name, sensor_port, 4000, task=self.task, mutex=self.mutex)
+            pyb.udelay(10000)
+
 
 sensors_names = {'temp 1': 4,
                  'temp 2': 5}
 
-mutex = esp.mutex()
 srv = network_init('iot', 'noodlebrain', '131.84.1.191', 8000)
-# sensors = init_temp_sensors(srv, mutex, sensors_names)
-#tt = esp.os_task()
-#aa = esp.dht(5, task=tt)
-#tt.handler(lambda task: handler(task, srv, aa, 'temp 1'))
-
-#t2 = esp.os_task()
-#bb = esp.dht(4, task=t2)
-#t2.handler(lambda task: handler(task, srv, bb, 'temp 2'))
-
-#aa.recv()
-#pyb.delay(100)
-#bb.recv()
-#pyb.delay(1000)
-
-# esp.deepsleep(20000001)
-#ta = esp.os_timer(lambda timer: aa.recv(), period=4000)
-#pyb.delay(200)
-#tb = esp.os_timer(lambda timer: bb.recv(), period=4000)
+mgr = SensorsManager(sensors_names, srv)

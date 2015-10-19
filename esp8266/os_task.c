@@ -47,7 +47,7 @@ STATIC ICACHE_FLASH_ATTR void esp_os_task_print(const mp_print_t *print, mp_obj_
     mp_printf(print, "task(callback=%p)", (unsigned int)&self->callback);
 }
 
-STATIC void task_common_callback(os_event_t *evt) {
+STATIC ICACHE_FLASH_ATTR void task_common_callback(os_event_t *evt) {
     esp_os_task_obj_t *self = (esp_os_task_obj_t *)evt->par;
     if (self->callback) {
         nlr_buf_t nlr;

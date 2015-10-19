@@ -95,6 +95,7 @@ typedef struct _mp_obj_dht_t {
     uint32_t mutex_fail_count;
     bool spinwait;      // uSeconds to spin waiting for the mutex to unlock. Not used in the sender.
     bool filled;        // data is available
+    uint32_t mserial;
 } mp_obj_dht_t;
 
 //TODO make a class to pass the final result
@@ -132,6 +133,7 @@ STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
     dhto->pmp = pmp;
     dhto->task = mp_const_none;
     dhto->mutex = mp_const_none;
+    dhto->mserial = 0;
     dhto->filled = false;
     dhtx_reset_values(dhto);
     esp_gpio_isr_attach(pmp, dhtx, dhto, 50); // 50 events
@@ -158,7 +160,7 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
         esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
         mvalue = mutex->mutex  == 0 ? "acquired" : "released";
     }
-    mp_printf(print, "class_dht %d %s inters=%d,bits=%d,task=%x,fails=%d,mutex=%s,spinwait=%s,filled=%s>\n",
+    mp_printf(print, "class_dht state=%d,error='%s', inters=%d, bits=%d, task=%x, fails=%d, mutex=%s, spinwait=%s, filled=%s, mserial=%d>\n",
             self->state,
             self->error,
             self->inters,
@@ -167,12 +169,15 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
             self->mutex_fail_count, 
             mvalue,
             self->spinwait ? "True" : "False",
-            self->filled ? "True" : "False");
+            self->filled ? "True" : "False",
+            self->mserial);
 
+#if 0
     for (int ii = 0; ii < DHT_BYTES; ii++) {
         printf("%d,\'%2x\',%u,\'"BYTETOBINARYPATTERN"\'\n", ii, self->bytes[ii], self->bytes[ii], BYTETOBINARY(self->bytes[ii]));
     }
-    printf("%d %d %d = %d", self->bytes[0] * 256 + self->bytes[1],
+#endif
+    mp_printf(print, "%d %d %d = %d", self->bytes[0] * 256 + self->bytes[1],
                     self->bytes[2] * 256 + self->bytes[3],
                     (self->bytes[0] + self->bytes[1] + self->bytes[2] + self->bytes[3]) & 0xFF, self->bytes[4]);
 }
@@ -220,6 +225,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
 // don't try macros like this at home 
 #define  dht_error(dht, error_str) dht->error = error_str, dht->state = DHT_ERROR; return -1
 
+STATIC uint32 mserial = 0;
 
 STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
 {
@@ -289,6 +295,7 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
                 }
             } 
             memcpy(self->current, self->bytes, DHT_BYTES);
+            self->mserial = mserial++;
             self->filled = true;
             if (self->mutex != mp_const_none) {
                 esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
@@ -305,14 +312,14 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
 }
 
 // TODO: remove this and use the system module if it can't be pre-empted
-STATIC void  delay_us(int delay) {
+STATIC ICACHE_FLASH_ATTR void  delay_us(int delay) {
     uint32_t count0 = xthal_get_ccount(); 
     uint32_t delayCount = delay * ets_get_cpu_frequency();
     while (xthal_get_ccount() - count0 < delayCount)
         ;
 }
 
-STATIC void dht_host_up(void *parg)
+STATIC ICACHE_FLASH_ATTR void dht_host_up(void *parg)
 {
     mp_obj_dht_t *self = (mp_obj_dht_t *)parg;
     os_timer_disarm(&self->timer);
@@ -333,21 +340,6 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_state(mp_obj_t self_in, mp_obj_t l
     return mp_obj_new_int(self->state);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_state_obj, mod_esp_dht_state);
-
-
-// TODO: add kwarg to clear old values. If clear old is set there is no value 
-// then return None? or exception?
-// for name,sensor in sensors.items():
-//      blah[name] = sesnsor.values(consume=True)
-//
-#if 0
-has to be this anyway for a mutex failing to acquire
-for name,sensor in sensors.items():
-    try:
-        blah[name] = sensor.values(consume=True)
-    except // can be mutex fail or no value
-        continue
-#endif
 
 
 /// \method values([consume])
@@ -377,7 +369,6 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_dht_values(mp_uint_t n_args, const mp_
         }
         if (consume == true) {
             self->filled = false;
-            printf("setting fileld to false\n");
         }
         got_values = true;
     }

@@ -50,8 +50,6 @@ STATIC ICACHE_FLASH_ATTR void mod_esp_mutex_print(const mp_print_t *print, mp_ob
 }
 
 
-///
-
 
 STATIC const mp_arg_t mod_esp_mutex_init_args[] = {
     { MP_QSTR_spin_time, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 0} },
@@ -72,7 +70,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_make_new(mp_obj_t type_in, mp_ui
 
 // mutex by Richard Antony Burton
 // https://github.com/raburton/esp8266/tree/master/mutex
-bool ICACHE_FLASH_ATTR esp_acquire_mutex(mutex_t *mutex) {
+bool esp_acquire_mutex(mutex_t *mutex) {
 
     int iOld = 1, iNew = 0;
 
@@ -91,7 +89,7 @@ bool ICACHE_FLASH_ATTR esp_acquire_mutex(mutex_t *mutex) {
     return (bool)iOld;
 }
 
-void ICACHE_FLASH_ATTR esp_release_mutex(mutex_t *mutex) {
+void esp_release_mutex(mutex_t *mutex) {
     *mutex = 1;
 }
 
@@ -119,7 +117,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_acquire(mp_obj_t self_in, mp_obj
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_mutex_acquire_obj, mod_esp_mutex_acquire);
 
-STATIC mp_obj_t mod_esp_mutex_release(mp_obj_t self_in, mp_obj_t lambda_in) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_release(mp_obj_t self_in, mp_obj_t lambda_in) {
     esp_mutex_obj_t *self = self_in;
 
     esp_release_mutex(&self->mutex);
