@@ -59,6 +59,11 @@ class Socky:
         print("sending  '%s'" % data_as_text)
         return to_send
 
+    def runner(self):
+        pass
+    def run(self, period):
+        pass
+
     def state(self):
         return self.soc.state()
 
@@ -125,5 +130,5 @@ class SensorsManager:
 sensors_names = {'temp 1': 4,
                  'temp 2': 5}
 
-srv = network_init('iot', 'noodlebrain', '131.84.1.191', 8000)
-mgr = SensorsManager(sensors_names, srv)
+#srv = network_init('iot', 'noodlebrain', '131.84.1.191', 8000)
+#mgr = SensorsManager(sensors_names, srv)
