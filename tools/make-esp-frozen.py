@@ -65,14 +65,19 @@ if __name__ == '__main__':
     for fname in module_names:
         modules[fname] = str_to_array(getcc(os.path.join(cmd_line.dir_name, fname)), os.path.splitext(fname)[0])
 
+    def roundup(num, div):
+        return num + ((div - (num % div)) % div)
+
+
     with open(cmd_line.out_file, 'w') as of:
         of.write("#include <stdint.h>\n")
-        of.write('#include "esp_frozen.h"\n')
+        of.write('#include "esp_frozen.h"\n\n')
+        of.write("const uint16_t mp_frozen_table_size = %d;\n\n" % len(modules))
         of.write("const esp_frozen_t mp_frozen_table[] = {\n")
         position = 0
         for module in modules.itervalues():
             of.write('\t{"%s", %d, %d},\n' % (module.name, position / 4, module.size))
-            position += module.size
+            position += roundup(module.size, 4)
         of.write('\t{(const char *)0, %d, 0}\n' % (position / 4))
         of.write('};\n\n')
 
