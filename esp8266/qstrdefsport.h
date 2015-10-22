@@ -121,6 +121,8 @@ Q(ESPCONN_WRITE)
 Q(ESPCONN_READ)
 Q(ESPCONN_CLOSE)
 
+Q(test)
+
 // Pin class
 Q(Pin)
 Q(init)

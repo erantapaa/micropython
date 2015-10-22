@@ -435,7 +435,6 @@ STATIC mp_obj_t esp_socket_ondisconnect(mp_obj_t self_in, mp_obj_t lambda_in) {
     s->cb_disconnect = lambda_in;
 
     if (s->espconn->state == ESPCONN_CLOSE) {
-        printf("Calling oon account of close\n");
         call_function_1_protected(s->cb_disconnect, s);
     }
 
@@ -616,6 +615,14 @@ STATIC mp_obj_t esp__init__(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, 
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp__init__obj, esp__init__);
 
+STATIC mp_obj_t esp_test() {
+    extern void rofl();
+
+    printf("calling rofl\n");
+    rofl();
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_test_obj, esp_test);
 
 STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_esp) },
@@ -634,6 +641,7 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_dht), (mp_obj_t)&esp_dht_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_mutex), (mp_obj_t)&esp_mutex_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR___init__), (mp_obj_t)&esp__init__obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&esp_test_obj },
 
 #if MODESP_INCLUDE_CONSTANTS
     { MP_OBJ_NEW_QSTR(MP_QSTR_MODE_11B),

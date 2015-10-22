@@ -7,6 +7,7 @@ QSTR_DEFS = qstrdefsport.h #$(BUILD)/pins_qstr.h
 include ../py/py.mk
 
 MAKE_FROZEN = ../tools/make-frozen.py
+MAKE_ESP_FROZEN = ../tools/make-esp-frozen.py
 
 SCRIPTDIR = scripts
 PORT = /dev/ttyUSB0
@@ -69,6 +70,8 @@ SRC_C = \
 	mod_esp_gpio.c \
 	mod_esp_dht.c \
 	mod_esp_mutex.c \
+	rofl.c \
+	$(BUILD)/esp_frozen.c \
 	$(BUILD)/frozen.c \
 
 STM_SRC_C = $(addprefix stmhal/,\
@@ -111,6 +114,10 @@ $(BUILD)/uart.o: $(CONFVARS_FILE)
 $(BUILD)/frozen.c: $(wildcard $(SCRIPTDIR)/*) $(CONFVARS_FILE)
 	$(ECHO) "Generating $@"
 	$(Q)$(MAKE_FROZEN) $(SCRIPTDIR) > $@
+
+$(BUILD)/esp_frozen.c: $(wildcard $(SCRIPTDIR)/*) $(CONFVARS_FILE)
+	$(ECHO) "Generating $@"
+	$(Q)$(MAKE_ESP_FROZEN) -d $(SCRIPTDIR) -o $@
 
 .PHONY: deploy
 
