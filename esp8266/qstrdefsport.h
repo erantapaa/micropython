@@ -121,7 +121,7 @@ Q(ESPCONN_WRITE)
 Q(ESPCONN_READ)
 Q(ESPCONN_CLOSE)
 
-Q(test)
+Q(romrun)
 
 // Pin class
 Q(Pin)

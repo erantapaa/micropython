@@ -600,29 +600,42 @@ STATIC mp_obj_t esp_deepsleep(mp_uint_t n_args, const mp_obj_t *args) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(esp_deepsleep_obj, 0, 1, esp_deepsleep);
 
+uint32_t fs_size()
+{
+    uint32_t id = spi_flash_get_id();  
+    printf("id %x\n", id);
+    uint8_t mfgr_id = id & 0xff;
+    uint8_t size_id = (id >> 16) & 0xff; 
+    if(mfgr_id != 0xEF) {
+        printf("Manufacturer %x\n", mfgr_id);
+        return 0;
+    }
+    return 1 << size_id;
+}
 STATIC mp_obj_t esp_flash_id() {
-    return mp_obj_new_int(spi_flash_get_id());
+    //return mp_obj_new_int(spi_flash_get_id());
+    return mp_obj_new_int(fs_size());
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_flash_id_obj, esp_flash_id);
 
 
 // STATIC mp_obj_t ICACHE_FLASH_ATTR esp__init__() {
 STATIC mp_obj_t esp__init__(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
-    printf("called init");
     esp_os_task_init();
     esp_gpio_init();
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp__init__obj, esp__init__);
 
-STATIC mp_obj_t esp_test() {
-    extern void rofl();
+STATIC mp_obj_t esp_romrun(mp_obj_t obj) {
+    extern int rofl(const char *mod);
+    mp_uint_t len;
+    const char *ss = mp_obj_str_get_data(obj, &len);
 
-    printf("calling rofl\n");
-    rofl();
+    rofl(ss);
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_test_obj, esp_test);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_romrun_obj, esp_romrun);
 
 STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_esp) },
@@ -641,7 +654,7 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_dht), (mp_obj_t)&esp_dht_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_mutex), (mp_obj_t)&esp_mutex_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR___init__), (mp_obj_t)&esp__init__obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&esp_test_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_romrun), (mp_obj_t)&esp_romrun_obj },
 
 #if MODESP_INCLUDE_CONSTANTS
     { MP_OBJ_NEW_QSTR(MP_QSTR_MODE_11B),

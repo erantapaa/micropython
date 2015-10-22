@@ -100,6 +100,7 @@ SECTIONS
 
         /* we put as much rodata as possible in this section */
         /* note that only rodata accessed as a machine word is allowed here */
+        *build/*.o(.rodata.mp_frozen_qwords)
         *py/qstr.o(.rodata.const_pool)
         *py/*.o(.rodata.mp_type_*) /* catches type: mp_obj_type_t */
         *py/*.o(.rodata.*_locals_dict*) /* catches types: mp_obj_dict_t, mp_map_elem_t */
