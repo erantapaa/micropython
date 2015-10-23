@@ -7,3 +7,6 @@ typedef struct esp_frozen {
 extern const esp_frozen_t mp_frozen_table[];
 extern const uint32_t mp_frozen_qwords[];
 extern const uint16_t mp_frozen_table_size;
+
+
+extern int rofl(const char *mod);

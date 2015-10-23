@@ -71,8 +71,8 @@ SRC_C = \
 	mod_esp_dht.c \
 	mod_esp_mutex.c \
 	romrun.c \
-	$(BUILD)/esp_frozen.c \
-	$(BUILD)/frozen.c \
+	$(BUILD)/esp_frozen.c
+	# $(BUILD)/frozen.c 
 
 STM_SRC_C = $(addprefix stmhal/,\
 	printf.c \

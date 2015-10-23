@@ -34,17 +34,17 @@ def decode(array, asize):
     return out_str
 
 
-fmodule = collections.namedtuple('fmodule', 'name values size')
+fmodule = collections.namedtuple('fmodule', 'name values size strdata')
 
 
-def str_to_array(iterable, name=None):
+def str_to_array(data, name=None):
     values = []
-    for bcount, cc in enumerate(iterable):
+    for bcount, cc in enumerate(data):
         nibble = bcount % 4
         if not nibble:
             values.append(0)
         values[-1] += ord(cc) << (nibble * 8)
-    return fmodule(name, values, bcount + 1)        # always add 1 because enumerate 0 1 2 3 is size 4
+    return fmodule(name, values, bcount + 1, data)        # always add 1 because enumerate 0 1 2 3 is size 4
 
 
 if __name__ == '__main__':
@@ -63,11 +63,12 @@ if __name__ == '__main__':
 
     modules = dict()
     for fname in module_names:
-        modules[fname] = str_to_array(getcc(os.path.join(cmd_line.dir_name, fname)), os.path.splitext(fname)[0])
+        data = ''.join(getcc(os.path.join(cmd_line.dir_name, fname)))
+        # data = data.replace('"', '\\"')
+        modules[fname] = str_to_array(data, os.path.splitext(fname)[0])
 
     def roundup(num, div):
         return num + ((div - (num % div)) % div)
-
 
     with open(cmd_line.out_file, 'w') as of:
         of.write("#include <stdint.h>\n")
@@ -76,9 +77,8 @@ if __name__ == '__main__':
         of.write("const esp_frozen_t mp_frozen_table[] = {\n")
         position = 0
         for module in modules.itervalues():
-            of.write('\t{"%s", %d, %d},\n' % (module.name, position / 4, module.size))
-            position += roundup(module.size, 4)
-        of.write('\t{(const char *)0, %d, 0}\n' % (position / 4))
+            of.write('\t{"%s", %d, %d},\n' % (module.name, position, module.size))
+            position += len(module.values)
         of.write('};\n\n')
 
         of.write("const uint32_t mp_frozen_qwords[] = {\n")

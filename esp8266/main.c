@@ -36,6 +36,7 @@
 #include "py/gc.h"
 #include "pyexec.h"
 #include "gccollect.h"
+#include "esp_frozen.h"
 #include MICROPY_HAL_H
 #include "user_interface.h"
 
@@ -51,6 +52,9 @@ STATIC void  ICACHE_FLASH_ATTR mp_reset(void) {
 #if MICROPY_MODULE_FROZEN
     mp_lexer_t *lex = mp_find_frozen_module("main", 4);
     mp_parse_compile_execute(lex, MP_PARSE_FILE_INPUT, mp_globals_get(), mp_locals_get());
+#endif
+#if MICROPY_MODULE_ESP_FROZEN
+    rofl("main");
 #endif
 }
 

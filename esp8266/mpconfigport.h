@@ -37,10 +37,11 @@
 #define MICROPY_LONGINT_IMPL        (MICROPY_LONGINT_IMPL_LONGLONG)
 #define MICROPY_FLOAT_IMPL          (MICROPY_FLOAT_IMPL_NONE)
 #define MICROPY_ERROR_REPORTING     (MICROPY_ERROR_REPORTING_TERSE)
-#define MICROPY_MODULE_FROZEN       (1)
+#define MICROPY_MODULE_FROZEN       (0)
 #define MICROPY_PY_URE              (1)
 #define MICROPY_PY_UJSON            (1)
 #define MICROPY_MODULE_BUILTIN_INIT (1)
+#define MICROPY_MODULE_ESP_FROZEN   (1)
 
 // type definitions for the specific machine
 
