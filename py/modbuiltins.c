@@ -93,7 +93,7 @@ STATIC mp_obj_t mp_builtin_abs(mp_obj_t o_in) {
     if (0) {
         // dummy
 #if MICROPY_PY_BUILTINS_FLOAT
-    } else if (MP_OBJ_IS_TYPE(o_in, &mp_type_float)) {
+    } else if (mp_obj_is_float(o_in)) {
         mp_float_t value = mp_obj_float_get(o_in);
         // TODO check for NaN etc
         if (value < 0) {
@@ -415,6 +415,10 @@ STATIC mp_obj_t mp_builtin___repl_print__(mp_obj_t o) {
         #else
         mp_obj_print_helper(&mp_plat_print, o, PRINT_REPR);
         mp_print_str(&mp_plat_print, "\n");
+        #endif
+        #if MICROPY_CAN_OVERRIDE_BUILTINS
+        mp_obj_t dest[2] = {MP_OBJ_SENTINEL, o};
+        mp_type_module.attr((mp_obj_t)&mp_module_builtins, MP_QSTR__, dest);
         #endif
     }
     return mp_const_none;

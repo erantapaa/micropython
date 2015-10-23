@@ -32,7 +32,7 @@ DEVICE=0483:df11
 
 CROSS_COMPILE = arm-none-eabi-
 
-INC =  -I.
+INC += -I.
 INC += -I..
 INC += -I$(BUILD)
 INC += -I$(CMSIS_DIR)/inc
@@ -135,6 +135,7 @@ SRC_C = \
 	pyexec.c \
 	help.c \
 	input.c \
+	modmachine.c \
 	modpyb.c \
 	modstm.c \
 	moduos.c \
