@@ -70,6 +70,7 @@ SRC_C = \
 	mod_esp_gpio.c \
 	mod_esp_dht.c \
 	mod_esp_mutex.c \
+	esp_irom.c \
 	romrun.c \
 	$(BUILD)/esp_frozen.c
 	# $(BUILD)/frozen.c 

@@ -55,7 +55,9 @@ STATIC void  ICACHE_FLASH_ATTR mp_reset(void) {
     mp_parse_compile_execute(lex, MP_PARSE_FILE_INPUT, mp_globals_get(), mp_locals_get());
 #endif
 #if MICROPY_MODULE_ESP_FROZEN
-    rofl("main");
+    extern mp_lexer_t * mp_find_irom_frozen_module(const char *mod);
+    mp_lexer_t *lex = mp_find_irom_frozen_module("main");
+    mp_parse_compile_execute(lex, MP_PARSE_FILE_INPUT, mp_globals_get(), mp_locals_get());
 #endif
 }
 
