@@ -72,6 +72,7 @@ if __name__ == '__main__':
 
     with open(cmd_line.out_file, 'w') as of:
         of.write("#include <stdint.h>\n")
+        of.write('#include "py/runtime.h"\n')
         of.write('#include "esp_frozen.h"\n\n')
         of.write("const uint16_t mp_frozen_table_size = %d;\n\n" % len(modules))
         of.write("const esp_frozen_t mp_frozen_table[] = {\n")
