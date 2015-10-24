@@ -50,13 +50,8 @@ STATIC void  ICACHE_FLASH_ATTR mp_reset(void) {
     mp_init();
     mp_obj_list_init(mp_sys_path, 0);
     mp_obj_list_init(mp_sys_argv, 0);
-#if MICROPY_MODULE_FROZEN
+#if MICROPY_MODULE_FROZEN || MICROPY_MODULE_ESP_FROZEN
     mp_lexer_t *lex = mp_find_frozen_module("main", 4);
-    mp_parse_compile_execute(lex, MP_PARSE_FILE_INPUT, mp_globals_get(), mp_locals_get());
-#endif
-#if MICROPY_MODULE_ESP_FROZEN
-    extern mp_lexer_t * mp_find_irom_frozen_module(const char *mod);
-    mp_lexer_t *lex = mp_find_irom_frozen_module("main");
     mp_parse_compile_execute(lex, MP_PARSE_FILE_INPUT, mp_globals_get(), mp_locals_get());
 #endif
 }
