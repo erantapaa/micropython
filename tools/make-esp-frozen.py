@@ -63,6 +63,7 @@ if __name__ == '__main__':
 
     modules = dict()
     for fname in module_names:
+        # getcc originally returned an iterator because there was some processing in between
         data = ''.join(getcc(os.path.join(cmd_line.dir_name, fname)))
         # data = data.replace('"', '\\"')
         modules[fname] = str_to_array(data, os.path.splitext(fname)[0])

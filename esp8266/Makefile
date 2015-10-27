@@ -14,6 +14,7 @@ PORT = /dev/ttyUSB0
 BAUD = 115200
 CROSS_COMPILE = xtensa-lx106-elf-
 ESP_SDK = $(shell $(CC) -print-sysroot)/usr
+ESP_DRIVER_LIB=/home/rfo/wa/esp/esp-open-sdk/sdk/examples/driver_lib
 
 INC += -I.
 INC += -I..
@@ -23,6 +24,8 @@ INC += -I../lib/netutils
 INC += -I../lib/timeutils
 INC += -I$(BUILD)
 INC += -I$(ESP_SDK)/include
+
+INC += -Idevices
 
 UART_OS = 1
 
@@ -70,10 +73,12 @@ SRC_C = \
 	mod_esp_gpio.c \
 	mod_esp_dht.c \
 	mod_esp_mutex.c \
+	mod_esp_I2C.c \
 	esp_irom.c \
-	romrun.c \
-	$(BUILD)/esp_frozen.c
-	# $(BUILD)/frozen.c 
+	rofl.c \
+	driver/i2c_master.c \
+	$(BUILD)/esp_frozen.c 
+
 
 STM_SRC_C = $(addprefix stmhal/,\
 	printf.c \

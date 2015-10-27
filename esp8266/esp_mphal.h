@@ -28,7 +28,7 @@
 #define _INCLUDED_MPHAL_H_
 
 // SDK functions not declared in SDK itself
-void ets_isr_mask(unsigned);
+
 
 void mp_hal_init(void);
 void mp_hal_feed_watchdog(void);

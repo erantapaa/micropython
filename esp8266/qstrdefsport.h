@@ -183,3 +183,9 @@ Q(mutex)
 Q(acquire)
 Q(release)
 Q(spin_time)
+
+
+// esp I2C
+Q(I2C)
+Q(sda_pin)
+Q(scl_pin)
