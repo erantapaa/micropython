@@ -40,11 +40,15 @@
 #include "ip_addr.h"
 #include "spi_flash.h"
 #include "utils.h"
+
+#include "driver/i2c_master.h"
+
 #include "os_timer.h"
 #include "os_task.h"
 #include "mod_esp_gpio.h"
 #include "mod_esp_dht.h"
 #include "mod_esp_mutex.h"
+#include "mod_esp_I2C.h"
 
 STATIC const mp_obj_type_t esp_socket_type;
 
@@ -627,15 +631,15 @@ STATIC mp_obj_t esp__init__(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, 
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp__init__obj, esp__init__);
 
-STATIC mp_obj_t esp_romrun(mp_obj_t obj) {
-    extern int rofl(const char *mod);
+STATIC mp_obj_t esp_test(mp_obj_t obj) {
+    extern int rofl(const char *ss);
     mp_uint_t len;
     const char *ss = mp_obj_str_get_data(obj, &len);
 
     rofl(ss);
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_romrun_obj, esp_romrun);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_test_obj, esp_test);
 
 STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_esp) },
@@ -654,7 +658,8 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_dht), (mp_obj_t)&esp_dht_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_mutex), (mp_obj_t)&esp_mutex_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR___init__), (mp_obj_t)&esp__init__obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_romrun), (mp_obj_t)&esp_romrun_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&esp_test_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_I2C), (mp_obj_t)&esp_I2C_type },
 
 #if MODESP_INCLUDE_CONSTANTS
     { MP_OBJ_NEW_QSTR(MP_QSTR_MODE_11B),
