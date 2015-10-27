@@ -76,7 +76,7 @@ SRC_C = \
 	mod_esp_I2C.c \
 	esp_irom.c \
 	rofl.c \
-	driver/i2c_master.c \
+	esp_i2c_master.c \
 	$(BUILD)/esp_frozen.c 
 
 
