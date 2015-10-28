@@ -27,7 +27,7 @@ bool ICACHE_FLASH_ATTR ds3231_send(esp_i2c_t *esp_i2c, uint8 *data, uint8 len) {
 	i2c_master_start(esp_i2c);
 
 	// write address & direction
-	i2c_master_writeByteET(esp_i2c, (uint8)(DS3231_ADDR << 1));
+	i2c_master_writeByte(esp_i2c, (uint8)(DS3231_ADDR << 1));
 	if (!i2c_master_checkAck(esp_i2c)) {
 		printf("i2c error no ack for address\r\n");
 		i2c_master_stop(esp_i2c);
@@ -36,7 +36,7 @@ bool ICACHE_FLASH_ATTR ds3231_send(esp_i2c_t *esp_i2c, uint8 *data, uint8 len) {
 
 	// send the data
 	for (loop = 0; loop < len; loop++) {
-		i2c_master_writeByteET(esp_i2c, data[loop]);
+		i2c_master_writeByte(esp_i2c, data[loop]);
 		if (!i2c_master_checkAck(esp_i2c)) {
 			printf("i2c erro no ack for data\r\n");
 			i2c_master_stop(esp_i2c);
@@ -61,7 +61,7 @@ bool ICACHE_FLASH_ATTR ds3231_recv(esp_i2c_t *esp_i2c, uint8 *data, uint8 len) {
 	i2c_master_start(esp_i2c);
 
 	// write address & direction
-	i2c_master_writeByteET(esp_i2c, (uint8)((DS3231_ADDR << 1) | 1));
+	i2c_master_writeByte(esp_i2c, (uint8)((DS3231_ADDR << 1) | 1));
 	if (!i2c_master_checkAck(esp_i2c)) {
 		printf("i2c error write for recv\r\n");
 		i2c_master_stop(esp_i2c);
@@ -70,7 +70,7 @@ bool ICACHE_FLASH_ATTR ds3231_recv(esp_i2c_t *esp_i2c, uint8 *data, uint8 len) {
 
 	// read bytes
 	for (loop = 0; loop < len; loop++) {
-		data[loop] = i2c_master_readByteET(esp_i2c);
+		data[loop] = i2c_master_readByte(esp_i2c);
 		// send ack (except after last byte, then we send nack)
 		if (loop < (len - 1)) i2c_master_send_ack(esp_i2c); else i2c_master_send_nack(esp_i2c);
 	}

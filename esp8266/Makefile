@@ -75,10 +75,9 @@ SRC_C = \
 	mod_esp_mutex.c \
 	mod_esp_I2C.c \
 	esp_irom.c \
-	rofl.c \
 	esp_i2c_master.c \
+	rofl.c \
 	$(BUILD)/esp_frozen.c 
-
 
 STM_SRC_C = $(addprefix stmhal/,\
 	printf.c \
