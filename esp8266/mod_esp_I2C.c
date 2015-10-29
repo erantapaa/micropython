@@ -38,14 +38,15 @@
 #include "utils.h"
 #include "user_interface.h"
 
+#include "mod_esp_gpio.h"
+#include "esp_i2c_master.h"
 #include "mod_esp_I2C.h"
 
 STATIC ICACHE_FLASH_ATTR void mod_esp_I2C_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     esp_I2C_obj_t *self = self_in;
 
-    mp_printf(print, "I2C.pin=%d", self->sda_pin, self->scl_pin);
+    mp_printf(print, "I2C.sda_pin=%d, I2C.scl_pin=%d", self->esp_i2c.sda_pmp->pin, self->esp_i2c.scl_pmp->pin);
 }
-
 
 
 STATIC const mp_arg_t mod_esp_I2C_init_args[] = {
@@ -60,18 +61,36 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_make_new(mp_obj_t type_in, mp_uint
 
     esp_I2C_obj_t *self = m_new_obj(esp_I2C_obj_t);
     self->base.type = &esp_I2C_type;
-    self->sda_pin = vals[0].u_int;
-    self->scl_pin = vals[1].u_int;
+    i2c_master_gpio_init(&self->esp_i2c, vals[0].u_int, vals[1].u_int);
     return (mp_obj_t)self;
 }
 
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_send(mp_obj_t self_in) {
- //   esp_I2C_obj_t *self = self_in;
-    printf("send\n");
-    return mp_obj_new_bool(1);
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_send(mp_obj_t self_in, mp_obj_t o_in) {
+//    esp_I2C_obj_t *self = self_in;
+    if (!MP_OBJ_IS_TYPE(o_in, &mp_type_list)) {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "send argument must be a list"));
+    } 
+    mp_obj_list_t *o = MP_OBJ_CAST(o_in);
+
+    uint8_t *obuf = m_new(uint8_t, o->len);
+    for (mp_uint_t ii = 0; ii < o->len; ii++) {
+        mp_obj_t item = o->items[ii];
+        if (MP_OBJ_IS_SMALL_INT(item)) {
+            obuf[ii] = MP_OBJ_SMALL_INT_VALUE(item);
+        } else {
+            m_del(uint8_t, obuf, o->len);
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "not an int in list"));
+        }
+    }
+
+    printf("send %s len %d\n", obuf, o->len);
+//    espconn_sent(s->espconn, bufinfo.buf, bufinfo.len);
+
+    m_del(uint8_t, obuf, o->len);
+    return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_I2C_send_obj, mod_esp_I2C_send);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_esp_I2C_send_obj, mod_esp_I2C_send);
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_recv(mp_obj_t self_in) {
 //    esp_I2C_obj_t *self = self_in;

@@ -1,12 +1,12 @@
 /******************************************************************************
- * Copyright 2013-2014 Espressif Systems (Wuxi)
+ * Originally derived from Copyright 2013-2014 Espressif Systems (Wuxi)
+ * Copyright 2015 Rob Fowler
  *
- * FileName: i2c_master.c
- *
+ * FileName: esp_i2c_master.c
  * Description: i2c master API
- *
  * Modification history:
  *     2014/3/12, v1.0 create this file.
+ *     2015/28/10, re-write to use a structure and making it dynamically configurable
 *******************************************************************************/
 #include <stdio.h>
 #include "ets_sys.h"
@@ -33,8 +33,6 @@
 #define I2C_MASTER_SDA_LOW_SCL_LOW(i2c)  \
     gpio_output_set(0, 1<<i2c->sda_pmp->pin | 1<<i2c->scl_pmp->pin, 1<<i2c->sda_pmp->pin | 1<<i2c->scl_pmp->pin, 0)
 
-//LOCAL uint8 m_nLastSDA;
-//LOCAL uint8 m_nLastSCL;
 
 /******************************************************************************
  * FunctionName : i2c_master_setDC
@@ -44,7 +42,6 @@
  *                uint8 SCL
  * Returns      : NONE
 *******************************************************************************/
-
 LOCAL void ICACHE_FLASH_ATTR i2c_master_setDC(esp_i2c_t *esp_i2c, uint8 SDA, uint8 SCL)
 {
     SDA	&= 0x01;

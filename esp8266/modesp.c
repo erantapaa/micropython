@@ -41,13 +41,12 @@
 #include "spi_flash.h"
 #include "utils.h"
 
-#include "driver/i2c_master.h"
-
 #include "os_timer.h"
 #include "os_task.h"
 #include "mod_esp_gpio.h"
 #include "mod_esp_dht.h"
 #include "mod_esp_mutex.h"
+#include "esp_i2c_master.h"
 #include "mod_esp_I2C.h"
 
 STATIC const mp_obj_type_t esp_socket_type;

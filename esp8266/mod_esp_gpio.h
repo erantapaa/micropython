@@ -35,7 +35,7 @@ typedef struct {
     uint32_t period;
 } event_t;
 
-typedef struct {
+typedef struct pmap_s {
     uint16_t pin;
     uint32_t periph;
     uint16_t func;
