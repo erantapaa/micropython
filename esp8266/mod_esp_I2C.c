@@ -66,6 +66,31 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_make_new(mp_obj_t type_in, mp_uint
 }
 
 
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_beginTransmission(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+    STATIC const mp_arg_t begin_values_args[] = {
+        { MP_QSTR_address, MP_ARG_REQUIRED | MP_ARG_INT },
+        { MP_QSTR_write, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false}},
+    };
+
+    mp_arg_val_t arg_vals[MP_ARRAY_SIZE(begin_values_args)];
+    mp_arg_parse_all(n_args - 1, args + 1, kwargs, MP_ARRAY_SIZE(begin_values_args), begin_values_args, arg_vals);
+
+    esp_I2C_obj_t *self = args[0];
+    uint8_t address = arg_vals[0].u_int;
+    uint8_t write_flag = arg_vals[1].u_bool ? 1 : 0;
+    printf("address %d write_flag %d (0 for write 1 for read)\n", address, write_flag);
+    i2c_master_start(&self->esp_i2c);
+	// write address & direction
+	i2c_master_writeByte(&self->esp_i2c, (uint8)((address << 1) | write_flag)); // write
+	// i2c_master_writeByte(&self->esp_i2c, (uint8)(address << 1)); 
+	if (!i2c_master_checkAck(&self->esp_i2c)) {
+		i2c_master_stop(&self->esp_i2c);
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_OSError, "i2c no ack for address"));
+    }
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_esp_I2C_beginTransmission_obj, 1, mod_esp_I2C_beginTransmission);
+
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_write(mp_obj_t self_in, mp_obj_t o_in) {
     esp_I2C_obj_t *self = self_in;
     if (!MP_OBJ_IS_TYPE(o_in, &mp_type_list)) {
@@ -82,7 +107,6 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_write(mp_obj_t self_in, mp_obj_t o
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "not an int in list"));
         }
     }
-    printf("send %s len %d\n", obuf, o->len);
 	for (int loop = 0; loop < o->len; loop++) {
 		i2c_master_writeByte(&self->esp_i2c, obuf[loop]);
 		if (!i2c_master_checkAck(&self->esp_i2c)) {
@@ -93,57 +117,20 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_write(mp_obj_t self_in, mp_obj_t o
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_esp_I2C_write_obj, mod_esp_I2C_write);
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_read(mp_obj_t self_in) {
-//    esp_I2C_obj_t *self = self_in;
-    printf("receive\n");
-    return mp_const_none;
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_I2C_read_obj, mod_esp_I2C_read);
-
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_beginTransmission(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
-    STATIC const mp_arg_t begin_values_args[] = {
-        { MP_QSTR_address, MP_ARG_REQUIRED | MP_ARG_INT },
-        { MP_QSTR_write, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false}},
-    };
-
-    mp_arg_val_t arg_vals[MP_ARRAY_SIZE(begin_values_args)];
-    mp_arg_parse_all(n_args - 1, args + 1, kwargs, MP_ARRAY_SIZE(begin_values_args), begin_values_args, arg_vals);
-
-    esp_I2C_obj_t *self = args[0];
-    uint8_t address = arg_vals[0].u_int;
-    uint8_t read_flag = arg_vals[1].u_bool ? 0 : 1;
-    printf("address %d read_flag %d (0 for write 1 for read)\n", address, read_flag);
-    i2c_master_start(&self->esp_i2c);
-	// write address & direction
-	i2c_master_writeByte(&self->esp_i2c, (uint8)((address << 1) | read_flag)); // write
-	if (!i2c_master_checkAck(&self->esp_i2c)) {
-		i2c_master_stop(&self->esp_i2c);
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_OSError, "i2c no ack for address"));
-    }
-    return mp_const_none;
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_esp_I2C_beginTransmission_obj, 1, mod_esp_I2C_beginTransmission);
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_endTransmission(mp_obj_t self_in) {
     esp_I2C_obj_t *self = self_in;
 	i2c_master_stop(&self->esp_i2c);
-    printf("endTransmission\n");
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_I2C_endTransmission_obj, mod_esp_I2C_endTransmission);
 
-#if 0
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_requestFrom(mp_obj_t self_in,  mp_obj_t addr_in) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_read(mp_obj_t self_in,  mp_obj_t len_in) {
     esp_I2C_obj_t *self = self_in;
-    uint8_t address = mp_obj_get_int(addr_in);
-	// write address & direction
-	i2c_master_writeByte(esp_i2c, (uint8)((address << 1) | 1)); // read
-	if (!i2c_master_checkAck(&self->esp_i2c)) {
-		i2c_master_stop(&self->esp_i2c);
-        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_OSError, "i2c error write for recv"))
-	}
-	// read bytes
-	for (loop = 0; loop < len; loop++) {
+    uint8_t len = mp_obj_get_int(len_in);
+
+    uint8_t *data = alloca(len * sizeof(uint8_t));
+	for (int loop = 0; loop < len; loop++) {
 		data[loop] = i2c_master_readByte(&self->esp_i2c);
 		// send ack (except after last byte, then we send nack)
 		if (loop < (len - 1)) {
@@ -152,10 +139,15 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_requestFrom(mp_obj_t self_in,  mp_
             i2c_master_send_nack(&self->esp_i2c);
         }
 	}
-    return mp_const_none;
+    mp_obj_list_t *nl = mp_obj_new_list(len, NULL);
+    for (int loop = 0; loop < len; loop++) {
+        printf("data %d\n", data[loop]);
+        nl->items[loop] = MP_OBJ_NEW_SMALL_INT(data[loop]);
+    }
+    return nl;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_I2C_requestFrom_obj, mod_esp_I2C_requestFrom);
-#endif
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_esp_I2C_read_obj, mod_esp_I2C_read);
+
 
 STATIC const mp_map_elem_t mod_esp_I2C_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_write), (mp_obj_t)&mod_esp_I2C_write_obj },
