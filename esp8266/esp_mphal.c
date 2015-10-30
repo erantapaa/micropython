@@ -48,7 +48,7 @@ void ICACHE_FLASH_ATTR mp_hal_feed_watchdog(void) {
     //wdt_feed(); // might also work
 }
 
-void ICACHE_FLASH_ATTR mp_hal_udelay(uint32_t us) {
+void mp_hal_delay_us(uint32_t us) {
     ets_delay_us(us);
 }
 
@@ -58,7 +58,7 @@ int ICACHE_FLASH_ATTR mp_hal_stdin_rx_chr(void) {
         if (c != -1) {
             return c;
         }
-        mp_hal_udelay(1);
+        mp_hal_delay_us(1);
         mp_hal_feed_watchdog();
     }
 }
@@ -84,12 +84,12 @@ void ICACHE_FLASH_ATTR mp_hal_stdout_tx_strn_cooked(const char *str, uint32_t le
     }
 }
 
-uint32_t ICACHE_FLASH_ATTR HAL_GetTick(void) {
+uint32_t mp_hal_ticks_ms(void) {
     return system_get_time() / 1000;
 }
 
-void ICACHE_FLASH_ATTR HAL_Delay(uint32_t Delay) {
-    mp_hal_udelay(Delay * 1000);
+void mp_hal_delay_ms(uint32_t delay) {
+    mp_hal_delay_us(delay * 1000);
 }
 
 void ICACHE_FLASH_ATTR mp_hal_set_interrupt_char(int c) {

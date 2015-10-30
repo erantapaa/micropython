@@ -58,7 +58,7 @@ STATIC void  ICACHE_FLASH_ATTR mp_reset(void) {
 
 void ICACHE_FLASH_ATTR soft_reset(void) {
     mp_hal_stdout_tx_str("PYB: soft reset\r\n");
-    mp_hal_udelay(10000); // allow UART to flush output
+    mp_hal_delay_us(10000); // allow UART to flush output
     mp_reset();
     pyexec_event_repl_init();
 }
