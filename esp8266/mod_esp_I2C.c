@@ -65,16 +65,15 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_make_new(mp_obj_t type_in, mp_uint
 }
 
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_mem_write(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
-    STATIC const mp_arg_t mem_write_args[] = {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_write(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+    STATIC const mp_arg_t write_args[] = {
         { MP_QSTR_data, MP_ARG_REQUIRED | MP_ARG_OBJ },
         { MP_QSTR_address, MP_ARG_REQUIRED | MP_ARG_INT },
-        { MP_QSTR_register, MP_ARG_INT },
     };
     esp_I2C_obj_t *self = args[0];
 
-    mp_arg_val_t arg_vals[MP_ARRAY_SIZE(mem_write_args)];
-    mp_arg_parse_all(n_args - 1, args + 1, kwargs, MP_ARRAY_SIZE(mem_write_args), mem_write_args, arg_vals);
+    mp_arg_val_t arg_vals[MP_ARRAY_SIZE(write_args)];
+    mp_arg_parse_all(n_args - 1, args + 1, kwargs, MP_ARRAY_SIZE(write_args), write_args, arg_vals);
 
     if (!MP_OBJ_IS_TYPE(arg_vals[0].u_obj, &mp_type_list)) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "send argument must be a list"));
@@ -100,19 +99,18 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_mem_write(mp_uint_t n_args, const 
     i2c_master_stop(&self->esp_i2c);
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_esp_I2C_mem_write_obj, 2, mod_esp_I2C_mem_write);
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_esp_I2C_write_obj, 2, mod_esp_I2C_write);
 
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_mem_read(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
-    STATIC const mp_arg_t mem_read_args[] = {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_read(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+    STATIC const mp_arg_t read_args[] = {
         { MP_QSTR_len, MP_ARG_REQUIRED | MP_ARG_INT },
         { MP_QSTR_address, MP_ARG_REQUIRED | MP_ARG_INT },
-        { MP_QSTR_register, MP_ARG_INT },
     };
     esp_I2C_obj_t *self = args[0];
 
-    mp_arg_val_t arg_vals[MP_ARRAY_SIZE(mem_read_args)];
-    mp_arg_parse_all(n_args - 1, args + 1, kwargs, MP_ARRAY_SIZE(mem_read_args), mem_read_args, arg_vals);
+    mp_arg_val_t arg_vals[MP_ARRAY_SIZE(read_args)];
+    mp_arg_parse_all(n_args - 1, args + 1, kwargs, MP_ARRAY_SIZE(read_args), read_args, arg_vals);
 
     uint8_t len = arg_vals[0].u_int;
     uint8_t *data = alloca(len * sizeof(uint8_t));
@@ -139,12 +137,12 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_mem_read(mp_uint_t n_args, const m
     }
     return nl;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_esp_I2C_mem_read_obj, 2, mod_esp_I2C_mem_read);
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_esp_I2C_read_obj, 2, mod_esp_I2C_read);
 
 
 STATIC const mp_map_elem_t mod_esp_I2C_locals_dict_table[] = {
-    { MP_OBJ_NEW_QSTR(MP_QSTR_mem_write), (mp_obj_t)&mod_esp_I2C_mem_write_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_mem_read), (mp_obj_t)&mod_esp_I2C_mem_read_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_write), (mp_obj_t)&mod_esp_I2C_write_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_read), (mp_obj_t)&mod_esp_I2C_read_obj },
 };
 STATIC MP_DEFINE_CONST_DICT(mod_esp_I2C_locals_dict, mod_esp_I2C_locals_dict_table);
 
