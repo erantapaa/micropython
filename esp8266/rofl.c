@@ -46,7 +46,6 @@ bool ICACHE_FLASH_ATTR ds3231_send(esp_i2c_t *esp_i2c, uint8 *data, uint8 len) {
 
 	// signal i2c stop
 	i2c_master_stop(esp_i2c);
-
 	return true;
 
 }

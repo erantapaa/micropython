@@ -19,6 +19,8 @@
 #include "user_interface.h"
 #include "esp_mphal.h"
 
+#include "py/gc.h"
+
 #define RX_BUF_SIZE (256)
 #define UART_REPL UART0
 
@@ -224,6 +226,7 @@ void ICACHE_FLASH_ATTR uart_task_handler(os_event_t *evt) {
     WRITE_PERI_REG(UART_INT_CLR(UART_REPL), UART_RXFIFO_TOUT_INT_CLR | UART_RXFIFO_FULL_INT_ST);
     // Enable UART interrupts, so our task will receive events again from IRQ handler
     ETS_UART_INTR_ENABLE();
+    gc_collect();
 
     if (ret & PYEXEC_FORCED_EXIT) {
         soft_reset();
