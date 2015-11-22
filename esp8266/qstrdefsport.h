@@ -194,3 +194,9 @@ Q(write)
 Q(address)
 Q(data)
 Q(register)
+
+// esp 1wire
+Q(one_wire)
+Q(reset)
+Q(supress_skip)
+Q(power)

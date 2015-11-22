@@ -215,9 +215,9 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
     } 
     self->spinwait = vals[3].u_bool;
     // TODO: move these to the esp_gpio module
-    GPIO_REG_WRITE(GPIO_ENABLE_W1TS_ADDRESS, (1<<gpio_pin));
+    GPIO_REG_WRITE(GPIO_ENABLE_W1TS_ADDRESS, (1<<gpio_pin)); // Enable output, is this needed?
     gpio_pin_intr_state_set(GPIO_ID_PIN(pmp->pin), GPIO_PIN_INTR_ANYEDGE);  
-    GPIO_OUTPUT_SET(pmp->pin, 1);
+    GPIO_OUTPUT_SET(pmp->pin, 1);       // set output
     return self;
 }
 

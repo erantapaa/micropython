@@ -75,8 +75,10 @@ SRC_C = \
 	mod_esp_dht.c \
 	mod_esp_mutex.c \
 	mod_esp_I2C.c \
+	mod_esp_1wire.c \
 	esp_irom.c \
 	esp_i2c_master.c \
+	esp_1wire.c \
 	rofl.c \
 	$(BUILD)/esp_frozen.c 
 

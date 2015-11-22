@@ -47,6 +47,7 @@
 #include "mod_esp_mutex.h"
 #include "esp_i2c_master.h"
 #include "mod_esp_I2C.h"
+#include "mod_esp_1wire.h"
 
 STATIC const mp_obj_type_t esp_socket_type;
 
@@ -629,15 +630,15 @@ STATIC mp_obj_t esp__init__(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, 
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp__init__obj, esp__init__);
 
-STATIC mp_obj_t esp_test(mp_obj_t obj) {
-    extern int rofl(const char *ss);
+STATIC mp_obj_t esp_test(mp_obj_t obj, mp_obj_t obj2) {
+    extern int rofl(const char *ss, const int arg2);
     mp_uint_t len;
     const char *ss = mp_obj_str_get_data(obj, &len);
 
-    rofl(ss);
+    rofl(ss, mp_obj_get_int(obj2));
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_test_obj, esp_test);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(esp_test_obj, esp_test);
 
 STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_esp) },
@@ -658,6 +659,7 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___init__), (mp_obj_t)&esp__init__obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&esp_test_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_I2C), (mp_obj_t)&esp_I2C_type },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_one_wire), (mp_obj_t)&esp_1wire_type },
 
 #if MODESP_INCLUDE_CONSTANTS
     { MP_OBJ_NEW_QSTR(MP_QSTR_MODE_11B),
