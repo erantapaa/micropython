@@ -198,5 +198,5 @@ Q(register)
 // esp 1wire
 Q(one_wire)
 Q(reset)
-Q(supress_skip)
+Q(suppress_skip)
 Q(power)

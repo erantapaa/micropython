@@ -91,7 +91,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_write(mp_uint_t n_args, const mp
         { MP_QSTR_data, MP_ARG_REQUIRED | MP_ARG_OBJ },                             // 0
         { MP_QSTR_task, MP_ARG_OBJ | MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},     // 1
         { MP_QSTR_address, MP_ARG_OBJ | MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},  // 2          (4 bytes)
-        { MP_QSTR_supress_skip,  MP_ARG_BOOL | MP_ARG_KW_ONLY, {.u_bool = false}},  // 3
+        { MP_QSTR_suppress_skip,  MP_ARG_BOOL | MP_ARG_KW_ONLY, {.u_bool = false}},  // 3
         { MP_QSTR_power, MP_ARG_BOOL | MP_ARG_KW_ONLY,  {.u_bool = true}},         // 4
     };
     esp_1wire_obj_t *self = args[0];
