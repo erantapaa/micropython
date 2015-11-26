@@ -30,6 +30,7 @@
 #include <stddef.h>
 
 #include "py/nlr.h"
+#include "py/obj.h"
 #include "py/runtime.h"
 #include "py/gc.h"
 
@@ -39,7 +40,10 @@
 #include "user_interface.h"
 
 #include "os_task.h"
+#include "cqueue.h"
 
+STATIC os_event_t sensor_evt_queue[16];
+STATIC queue_t *task_q;
 
 STATIC ICACHE_FLASH_ATTR void esp_os_task_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     esp_os_task_obj_t *self = self_in;
@@ -48,22 +52,29 @@ STATIC ICACHE_FLASH_ATTR void esp_os_task_print(const mp_print_t *print, mp_obj_
 }
 
 STATIC ICACHE_FLASH_ATTR void task_common_callback(os_event_t *evt) {
-    esp_os_task_obj_t *self = (esp_os_task_obj_t *)evt->par;
-    if (self->callback) {
-        nlr_buf_t nlr;
-        if (nlr_push(&nlr) == 0) {
-            (void)mp_call_function_1(self->callback, self);
-        } else {
-            mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+    // esp_os_task_obj_t *self = (esp_os_task_obj_t *)evt->par;
+    queue_t *qptr = (queue_t *)evt->par;
+    esp_os_task_obj_t *tobj;
+
+    while (getItem(qptr, (void *)&tobj) != false) {
+        printf("item %x\n", (unsigned int)tobj->callback);
+        if (tobj->callback) {
+            nlr_buf_t nlr;
+            if (nlr_push(&nlr) == 0) {
+                printf("calling\n");
+                (void)mp_call_function_1(tobj->callback, tobj);
+            } else {
+                mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+            }
+            gc_collect();
         }
-        gc_collect();
     }
 }
 
-STATIC os_event_t sensor_evt_queue[16];
 
 void  ICACHE_FLASH_ATTR  esp_os_task_init() {
     system_os_task(task_common_callback, SENSOR_TASK_ID, sensor_evt_queue, sizeof(sensor_evt_queue) / sizeof(*sensor_evt_queue));
+    task_q = qInit(16,  sizeof (esp_os_task_obj_t *));
 }
 
 STATIC const mp_arg_t esp_os_task_init_args[] = {
@@ -78,13 +89,18 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_task_make_new(mp_obj_t type_in, mp_uint
     esp_os_task_obj_t *self = m_new_obj(esp_os_task_obj_t);
     self->base.type = &esp_os_task_type;
     self->callback = vals[0].u_obj;
+    printf("in %x\n", (unsigned int)self->callback);
     return (mp_obj_t)self;
 }
 
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_task_post(mp_obj_t self_in, mp_obj_t len_in) {
     esp_os_task_obj_t *self = self_in;
-    system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self);
+    printf("post %x\n", (unsigned int)self->callback);
+    if (qPutItem(task_q, (void *)&self) == false) {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, "q full"));
+    }
+    system_os_post(SENSOR_TASK_ID, 1, (os_param_t)task_q);
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_os_task_post_obj, esp_os_task_post);
@@ -95,6 +111,7 @@ STATIC mp_obj_t esp_os_task_handler(mp_obj_t self_in, mp_obj_t lambda_in) {
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(esp_os_task_handler_obj, esp_os_task_handler);
+
 
 STATIC const mp_map_elem_t esp_os_task_locals_dict_table[] = {
 //    { MP_OBJ_NEW_QSTR(MP_QSTR_cancel), (mp_obj_t)&esp_os_timer_cancel_obj },

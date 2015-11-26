@@ -69,6 +69,7 @@ SRC_C = \
 	modutime.c \
 	moduos.c \
 	utils.c \
+	cqueue.c \
 	os_timer.c \
 	os_task.c \
 	mod_esp_gpio.c \
@@ -81,6 +82,7 @@ SRC_C = \
 	esp_1wire.c \
 	rofl.c \
 	$(BUILD)/esp_frozen.c 
+
 
 STM_SRC_C = $(addprefix stmhal/,\
 	pybstdio.c \
