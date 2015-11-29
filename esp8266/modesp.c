@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #include "py/nlr.h"
 #include "py/obj.h"
@@ -624,6 +625,7 @@ STATIC mp_obj_t esp_flash_id() {
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_flash_id_obj, esp_flash_id);
 
 
+
 // STATIC mp_obj_t ICACHE_FLASH_ATTR esp__init__() {
 STATIC mp_obj_t esp__init__(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     esp_os_task_init();
@@ -642,6 +644,21 @@ STATIC mp_obj_t esp_test(mp_obj_t obj, mp_obj_t obj2) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(esp_test_obj, esp_test);
 
+STATIC mp_obj_t esp_flash_read(mp_obj_t offset_in, mp_obj_t len_in) {
+    mp_int_t offset = mp_obj_get_int(offset_in);
+    mp_int_t len = mp_obj_get_int(len_in);
+    byte *buf = m_new(byte, len);
+    // We know that allocation will be 4-byte aligned for sure
+    SpiFlashOpResult res = spi_flash_read(offset, (uint32_t*)buf, len);
+    if (res == SPI_FLASH_RESULT_OK) {
+        return mp_obj_new_bytes(buf, len);
+    }
+    m_del(byte, buf, len);
+    nlr_raise(mp_obj_new_exception_arg1(&mp_type_OSError, MP_OBJ_NEW_SMALL_INT(res == SPI_FLASH_RESULT_TIMEOUT ? ETIMEDOUT : EIO)));
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(esp_flash_read_obj, esp_flash_read);
+
+
 STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_esp) },
 
@@ -652,6 +669,7 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_sleep_type), (mp_obj_t)&esp_sleep_type_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_deepsleep), (mp_obj_t)&esp_deepsleep_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_flash_id), (mp_obj_t)&esp_flash_id_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_flash_read), (mp_obj_t)&esp_flash_read_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_socket), (mp_obj_t)&esp_socket_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_os_timer), (mp_obj_t)&esp_os_timer_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_os_task), (mp_obj_t)&esp_os_task_type },
