@@ -40,6 +40,7 @@
 #include "spi_flash.h"
 #include "utils.h"
 
+#include "cqueue.h"
 #include "os_timer.h"
 #include "os_task.h"
 #include "mod_esp_gpio.h"
@@ -48,6 +49,7 @@
 #include "esp_i2c_master.h"
 #include "mod_esp_I2C.h"
 #include "mod_esp_1wire.h"
+#include "mod_esp_queue.h"
 
 STATIC const mp_obj_type_t esp_socket_type;
 
@@ -660,6 +662,7 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&esp_test_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_I2C), (mp_obj_t)&esp_I2C_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_one_wire), (mp_obj_t)&esp_1wire_type },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_queue), (mp_obj_t)&esp_queue_type },
 
 #if MODESP_INCLUDE_CONSTANTS
     { MP_OBJ_NEW_QSTR(MP_QSTR_MODE_11B),

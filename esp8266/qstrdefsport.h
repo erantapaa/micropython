@@ -211,3 +211,9 @@ Q(READ_ROM)
 Q(MATCH_ROM)
 Q(SEARCH_ROM)
 Q(SKIP_ROM)
+
+// queue
+Q(size)
+Q(queue)
+Q(put)
+Q(get)

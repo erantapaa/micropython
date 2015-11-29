@@ -6,13 +6,13 @@ typedef struct  {
 	int last;
 	int items;
     int max_items;
-    size_t item_size;
-	void *data;
+	mp_obj_t *objs;
 } queue_t;
 
-queue_t ICACHE_FLASH_ATTR *qInit(int max_items, size_t item_size);
-bool ICACHE_FLASH_ATTR qEmpty(queue_t *queue);
-bool qPutItem(queue_t *queue, void *item);
-bool ICACHE_FLASH_ATTR getItem(queue_t *queue, void *item);
 
+queue_t ICACHE_FLASH_ATTR *qInit(int max_items);
+bool qPutItem(queue_t *queue, mp_obj_t item);
+bool ICACHE_FLASH_ATTR getItem(queue_t *queue, mp_obj_t *item);
+
+bool ICACHE_FLASH_ATTR qEmpty(queue_t *queue);
 #endif // _INCLUDED_CQUEUE_H_

@@ -93,22 +93,28 @@ void esp_release_mutex(mutex_t *mutex) {
     *mutex = 1;
 }
 
-void ICACHE_FLASH_ATTR acquire_or_raise(mp_obj_t py_obj_in) {
-    esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)py_obj_in;
-
-    if (esp_acquire_mutex(&mutex->mutex)) {
-        return;
+// not FLASH as this can be called in an interrupt handler
+bool acquire_or_spin(mutex_t *mutex, uint32_t spin_time) {
+    if (esp_acquire_mutex(mutex)) {
+        return true;
     }
-    if (mutex->spin_time) {
+    if (spin_time) {
         uint32_t count0 = xthal_get_ccount(); 
-        uint32_t delayCount = mutex->spin_time * ets_get_cpu_frequency();
+        uint32_t delayCount = spin_time * ets_get_cpu_frequency();
         while (xthal_get_ccount() - count0 < delayCount) {
-            if (esp_acquire_mutex(&mutex->mutex)) {
-                return;
+            if (esp_acquire_mutex(mutex)) {
+                return true;
             }
          }
     }
-    nlr_raise(mp_obj_new_exception_msg(&mp_type_Exception, "Unable to acquire mutex"));
+    return false;
+}
+
+void ICACHE_FLASH_ATTR acquire_or_raise(mp_obj_t py_obj_in) {
+    esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)py_obj_in;
+    if (!acquire_or_spin(&mutex->mutex, mutex->spin_time)) {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_Exception, "Unable to acquire mutex"));
+    }
 }
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_acquire(mp_obj_t self_in, mp_obj_t len_in) {

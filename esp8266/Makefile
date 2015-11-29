@@ -72,6 +72,7 @@ SRC_C = \
 	cqueue.c \
 	os_timer.c \
 	os_task.c \
+	mod_esp_queue.c \
 	mod_esp_gpio.c \
 	mod_esp_dht.c \
 	mod_esp_mutex.c \

@@ -233,6 +233,7 @@ STATIC void gc_sweep(void) {
             case AT_HEAD:
 #if MICROPY_ENABLE_FINALISER
                 if (FTB_GET(block)) {
+                    printf("del\n");
                     mp_obj_t obj = (mp_obj_t)PTR_FROM_BLOCK(block);
                     if (((mp_obj_base_t*)obj)->type != MP_OBJ_NULL) {
                         // if the object has a type then see if it has a __del__ method
