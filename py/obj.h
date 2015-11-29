@@ -495,6 +495,11 @@ extern const mp_obj_type_t mp_type_ValueError;
 extern const mp_obj_type_t mp_type_ViperTypeError;
 extern const mp_obj_type_t mp_type_ZeroDivisionError;
 
+#if MICROPY_MODULE_ESP_QUEUE
+extern const mp_obj_type_t mp_type_Full;
+extern const mp_obj_type_t mp_type_Empty;
+#endif
+
 // Constant objects, globally accessible
 // The macros are for convenience only
 #define mp_const_none ((mp_obj_t)&mp_const_none_obj)

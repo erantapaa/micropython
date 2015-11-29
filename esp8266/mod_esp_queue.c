@@ -78,7 +78,7 @@ STATIC mp_obj_t mod_esp_queue_put(mp_obj_t self_in, mp_obj_t add_obj) {
     esp_queue_obj_t *self = self_in;
     
     if (!qPutItem(self->q, add_obj)) {
-         nlr_raise(mp_obj_new_exception_msg(&mp_type_StopIteration, "Full"));
+         nlr_raise(mp_obj_new_exception(&mp_type_Full));
     }
     return mp_const_none;
 }
@@ -89,7 +89,7 @@ STATIC mp_obj_t mod_esp_queue_get(mp_obj_t self_in, mp_obj_t add_obj) {
     mp_obj_t obj;
 
     if (!getItem(self->q, &obj)) {
-         nlr_raise(mp_obj_new_exception_msg(&mp_type_StopIteration, "Empty"));
+         nlr_raise(mp_obj_new_exception(&mp_type_Empty));
     }
     return obj;
 }

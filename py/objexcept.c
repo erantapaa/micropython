@@ -221,6 +221,10 @@ MP_DEFINE_EXCEPTION(Exception, BaseException)
     MP_DEFINE_EXCEPTION(UnboundLocalError, NameError)
     */
   MP_DEFINE_EXCEPTION(OSError, Exception)
+#if MICROPY_MODULE_ESP_QUEUE
+    MP_DEFINE_EXCEPTION(Empty, Exception)
+    MP_DEFINE_EXCEPTION(Full, Exception)
+#endif
 #if MICROPY_PY_BUILTINS_TIMEOUTERROR
     MP_DEFINE_EXCEPTION_BASE(OSError)
     MP_DEFINE_EXCEPTION(TimeoutError, OSError)

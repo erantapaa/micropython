@@ -647,3 +647,7 @@ Q(slip)
 Q(status)
 #endif
 #endif
+#if MICROPY_MODULE_ESP_QUEUE
+Q(Empty)
+Q(Full)
+#endif

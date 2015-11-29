@@ -667,6 +667,10 @@ STATIC const mp_map_elem_t mp_module_builtins_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_NameError), (mp_obj_t)&mp_type_NameError },
     { MP_OBJ_NEW_QSTR(MP_QSTR_NotImplementedError), (mp_obj_t)&mp_type_NotImplementedError },
     { MP_OBJ_NEW_QSTR(MP_QSTR_OSError), (mp_obj_t)&mp_type_OSError },
+#if MICROPY_MODULE_ESP_QUEUE
+    { MP_OBJ_NEW_QSTR(MP_QSTR_Empty), (mp_obj_t)&mp_type_Empty },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_Full), (mp_obj_t)&mp_type_Full },
+#endif
     { MP_OBJ_NEW_QSTR(MP_QSTR_OverflowError), (mp_obj_t)&mp_type_OverflowError },
     { MP_OBJ_NEW_QSTR(MP_QSTR_RuntimeError), (mp_obj_t)&mp_type_RuntimeError },
     { MP_OBJ_NEW_QSTR(MP_QSTR_StopIteration), (mp_obj_t)&mp_type_StopIteration },
