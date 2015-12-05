@@ -78,7 +78,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_write(mp_uint_t n_args, const mp_o
     if (!MP_OBJ_IS_TYPE(arg_vals[0].u_obj, &mp_type_list)) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "send argument must be a list"));
     } 
-    mp_obj_list_t *o = MP_OBJ_CAST(arg_vals[0].u_obj);
+    mp_obj_list_t *o = arg_vals[0].u_obj;
     i2c_master_start(&self->esp_i2c);
 	i2c_master_writeByte(&self->esp_i2c, (uint8)(arg_vals[1].u_int << 1));  // write address
 	if (!i2c_master_checkAck(&self->esp_i2c)) {

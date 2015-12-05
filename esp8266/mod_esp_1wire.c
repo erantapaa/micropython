@@ -121,7 +121,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_write(mp_uint_t n_args, const mp
 
     if (arg_vals[2].u_obj != mp_const_none) {
         printf("address ..");
-        mp_obj_list_t *o = MP_OBJ_CAST(arg_vals[2].u_obj);
+        mp_obj_list_t *o = arg_vals[2].u_obj;
         if (o->len != 4) {
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "expecting 4 bytes for address"));
         }
@@ -129,7 +129,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_write(mp_uint_t n_args, const mp
     } else if (arg_vals[3].u_bool != true) {
         ds_write(self->gpio, SKIP_ROM, arg_vals[4].u_bool);
     }
-    write_mp_array(self, MP_OBJ_CAST(arg_vals[0].u_obj), arg_vals[4].u_bool);
+    write_mp_array(self, arg_vals[0].u_obj, arg_vals[4].u_bool);
     if (arg_vals[5].u_bool) {
         self->enable_int = true;
         gpio_pin_intr_state_set(GPIO_ID_PIN(self->gpio->pin), GPIO_PIN_INTR_POSEDGE);  // TODO: set as constants

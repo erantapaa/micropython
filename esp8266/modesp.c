@@ -41,7 +41,6 @@
 #include "spi_flash.h"
 #include "utils.h"
 
-#include "cqueue.h"
 #include "os_timer.h"
 #include "os_task.h"
 #include "mod_esp_gpio.h"
