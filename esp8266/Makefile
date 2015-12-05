@@ -39,7 +39,7 @@ CFLAGS = $(INC) -Wall -Wpointer-arith -Werror -ansi -std=gnu99 -nostdlib -DUART_
 	$(CFLAGS_XTENSA) $(COPT)
 
 LDFLAGS = -nostdlib -T esp8266.ld -Map=$(@:.elf=.map) --cref
-LIBS = -L$(ESP_SDK)/lib -lmain -ljson -llwip -lpp -lnet80211 -lwpa -lphy -lnet80211
+LIBS = -L$(ESP_SDK)/lib -lmain -ljson -llwip -lpp -lnet80211 -lwpa -lphy -lnet80211 -lcrypto
 
 LIBGCC_FILE_NAME = $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 LIBS += -L$(dir $(LIBGCC_FILE_NAME)) -lgcc
@@ -69,7 +69,6 @@ SRC_C = \
 	modutime.c \
 	moduos.c \
 	utils.c \
-	cqueue.c \
 	os_timer.c \
 	os_task.c \
 	mod_esp_queue.c \

@@ -38,17 +38,24 @@
 #include "os_type.h"
 #include "utils.h"
 #include "user_interface.h"
+#include "gpio.h"
 
 #include "mod_esp_gpio.h"
 #include "esp_1wire.h"
 #include "mod_esp_1wire.h"
 
+STATIC int esp_1wire_handler(void *args, uint32_t now, uint8_t signal)
+{
+    esp_1wire_obj_t *self = (esp_1wire_obj_t *)(args);
+    self->ints++;
+    return 0;
+}
+
 STATIC ICACHE_FLASH_ATTR void mod_esp_1wire_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     esp_1wire_obj_t *self = self_in;
 
-    mp_printf(print, "pmp.pin=%d", self->gpio->pin);
+    mp_printf(print, "pmp.pin=%d, ints=%d", self->gpio->pin, self->ints);
 }
-
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     STATIC const mp_arg_t mod_esp_1wire_init_args[] = {
@@ -60,12 +67,20 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_make_new(mp_obj_t type_in, mp_ui
     esp_1wire_obj_t *self = m_new_obj(esp_1wire_obj_t);
     self->base.type = &esp_1wire_type;
     self->gpio = ds_init(vals[0].u_int);
+    self->ints++;
+    self->enable_int = false;
+    esp_gpio_isr_attach(self->gpio, esp_1wire_handler, self, 0); // 50 events
     return (mp_obj_t)self;
 }
 
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_reset(mp_obj_t self_in, mp_obj_t len_in) {
     esp_1wire_obj_t *self = self_in;
+
+    if (self->enable_int) {
+        self->enable_int = false;
+        gpio_pin_intr_state_set(GPIO_ID_PIN(self->gpio->pin), GPIO_PIN_INTR_DISABLE);  // TODO: set as constants
+    }
     uint8_t vv =  ds_reset(self->gpio);
     if (vv < 0) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_OSError, vv == -1 ? "gpio wire is held down" : "no slaves held down pin"));
@@ -93,6 +108,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_write(mp_uint_t n_args, const mp
         { MP_QSTR_address, MP_ARG_OBJ | MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},  // 2          (4 bytes)
         { MP_QSTR_suppress_skip,  MP_ARG_BOOL | MP_ARG_KW_ONLY, {.u_bool = false}},  // 3
         { MP_QSTR_power, MP_ARG_BOOL | MP_ARG_KW_ONLY,  {.u_bool = true}},         // 4
+        { MP_QSTR_enable_int, MP_ARG_BOOL | MP_ARG_KW_ONLY,  {.u_bool = true}},         // 5
     };
     esp_1wire_obj_t *self = args[0];
 
@@ -111,9 +127,13 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_write(mp_uint_t n_args, const mp
         }
         write_mp_array(self, o, arg_vals[4].u_bool);
     } else if (arg_vals[3].u_bool != true) {
-        ds_write(self->gpio, 0xCC, arg_vals[4].u_bool);     // TODO: constants for 0xCC etc
+        ds_write(self->gpio, SKIP_ROM, arg_vals[4].u_bool);
     }
     write_mp_array(self, MP_OBJ_CAST(arg_vals[0].u_obj), arg_vals[4].u_bool);
+    if (arg_vals[5].u_bool) {
+        self->enable_int = true;
+        gpio_pin_intr_state_set(GPIO_ID_PIN(self->gpio->pin), GPIO_PIN_INTR_POSEDGE);  // TODO: set as constants
+    }
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_esp_1wire_write_obj, 2, mod_esp_1wire_write);
@@ -126,6 +146,10 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_read(mp_obj_t self_in,  mp_obj_t
     mp_uint_t mxl = mp_obj_get_int(len_in);
     mp_obj_tuple_t *tuple = mp_obj_new_tuple(mxl, NULL);
 
+    if (self->enable_int) {
+        self->enable_int = false;
+        gpio_pin_intr_state_set(GPIO_ID_PIN(self->gpio->pin), GPIO_PIN_INTR_DISABLE);  // TODO: set as constants
+    }
     for (int ii = 0; ii < mxl; ii++) {
         uint8_t val = ds_read(self->gpio);
         tuple->items[ii] = MP_OBJ_NEW_SMALL_INT(val);

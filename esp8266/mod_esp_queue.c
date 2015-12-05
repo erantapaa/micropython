@@ -38,7 +38,6 @@
 #include "utils.h"
 #include "user_interface.h"
 
-#include "cqueue.h"
 #include "mod_esp_mutex.h"
 #include "mod_esp_queue.h"
 
@@ -46,12 +45,12 @@
 STATIC ICACHE_FLASH_ATTR void mod_esp_queue_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     esp_queue_obj_t *self = self_in;
 
-    mp_printf(print, "queue.size=%d queue.items=%d", self->q->max_items, self->q->items);
+    mp_printf(print, "queue.size=%d queue.items=%d", self->max_items, self->items);
 }
 
 
 STATIC const mp_arg_t mod_esp_queue_init_args[] = {
-    {MP_QSTR_size, MP_ARG_REQUIRED | MP_ARG_INT},
+    {MP_QSTR_storage, MP_ARG_REQUIRED | MP_ARG_OBJ},
     {MP_QSTR_mutex, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none}}
 };
 #define ESP_MUTEX_INIT_NUM_ARGS MP_ARRAY_SIZE(mod_esp_queue_init_args)
@@ -60,44 +59,129 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_make_new(mp_obj_t type_in, mp_ui
     mp_arg_val_t vals[ESP_MUTEX_INIT_NUM_ARGS];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, ESP_MUTEX_INIT_NUM_ARGS, mod_esp_queue_init_args, vals);
 
+    if (!MP_OBJ_IS_TYPE(vals[0].u_obj,  &mp_type_list)) {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "storage needs to be a list"));
+    }
     esp_queue_obj_t *self = m_new_obj(esp_queue_obj_t);
+
     self->base.type = &esp_queue_type;
-    self->q = qInit(vals[0].u_int);
+    mp_obj_list_t *list = (mp_obj_list_t *)vals[0].u_obj;
+	self->items = 0;
+	self->first = 0;
+	self->last = 0;
+    self->max_items = list->len;
+    self->obj_instances = list->items;
     if (vals[1].u_obj != mp_const_none) {
         if (MP_OBJ_IS_TYPE(vals[1].u_obj, &esp_mutex_type)) {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "mutex is not coded yet"));
             self->mutex = vals[1].u_obj;
         } else {
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "mutex needs to be an esp.mutex type"));
         }
-    } 
+    }
     return (mp_obj_t)self;
 }
 
-// not FLASH because maybe used in an interrupt
-STATIC mp_obj_t mod_esp_queue_put(mp_obj_t self_in, mp_obj_t add_obj) {
+
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_put(mp_obj_t self_in, mp_obj_t add_obj) {
     esp_queue_obj_t *self = self_in;
-    
-    if (!qPutItem(self->q, add_obj)) {
+
+	if (self->items >= self->max_items) {
          nlr_raise(mp_obj_new_exception(&mp_type_Full));
-    }
+	}
+    self->items++;
+    self->obj_instances[self->last] = add_obj;
+    self->last = (self->last + 1) % self->max_items;
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_esp_queue_put_obj, mod_esp_queue_put);
 
-STATIC mp_obj_t mod_esp_queue_get(mp_obj_t self_in, mp_obj_t add_obj) {
-    esp_queue_obj_t *self = self_in;
-    mp_obj_t obj;
 
-    if (!getItem(self->q, &obj)) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_get(mp_obj_t self_in) {
+    esp_queue_obj_t *self = self_in;
+
+	if (self->items == 0) {
          nlr_raise(mp_obj_new_exception(&mp_type_Empty));
-    }
-    return obj;
+	}
+    mp_obj_t ret = self->obj_instances[self->first];
+    self->first = (self->first + 1) % self->max_items;
+    self->items--;
+    return ret;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_queue_get_obj, mod_esp_queue_get);
+
+// for use in interrupts
+bool esp_queue_dalist_8(esp_queue_obj_t *queue_in, uint32_t len, uint8_t *vals) {
+	if (queue_in->items >= queue_in->max_items) {
+        // printf("full\n");
+        return false;
+    } 
+
+    mp_obj_t *inst = queue_in->obj_instances[queue_in->last];
+    if (!MP_OBJ_IS_TYPE(inst,  &mp_type_list)) {
+        // printf("not a list\n");
+        return false;
+    }
+    mp_obj_list_t *al = (mp_obj_list_t *)inst;
+    if (len > al->len) {
+        // printf("too many values (%d) for list %d\n", len, al->len);
+        return false;
+    }
+    for (int ii = 0; ii < len; ii++, vals++) {
+        al->items[ii] = MP_OBJ_NEW_SMALL_INT(*vals); // WARNING: no checking, can explode, but unlikely as 8 bits in 
+    }
+    queue_in->items++;
+    queue_in->last = (queue_in->last + 1) % queue_in->max_items;
+    return true;
+}
+
+// for use in interrupts
+bool esp_queue_daint_8(esp_queue_obj_t *queue_in, uint8_t value) {
+	if (queue_in->items >= queue_in->max_items) {
+        // printf("full\n");
+        return false;
+    } 
+    queue_in->obj_instances[queue_in->last] = MP_OBJ_NEW_SMALL_INT(value);
+    queue_in->items++;
+    queue_in->last = (queue_in->last + 1) % queue_in->max_items;
+    return true;
+}
+
+
+STATIC mp_obj_t mod_esp_queue_test(mp_obj_t self_in, mp_obj_t add_obj) {
+#if 1
+    esp_queue_obj_t *self = self_in;
+	if (self->items >= self->max_items) {
+         nlr_raise(mp_obj_new_exception(&mp_type_Full));
+    } 
+
+    if (MP_OBJ_IS_TYPE(self->obj_instances[self->last],  &mp_type_list)) {
+        if (!MP_OBJ_IS_TYPE(add_obj,  &mp_type_list)) {
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "pass a list only"));
+        }
+        mp_obj_list_t *in = (mp_obj_list_t *)add_obj;
+
+        uint8_t vars[in->len];
+        for (int ii = 0; ii < in->len; ii++) {
+            vars[ii] = MP_OBJ_SMALL_INT_VALUE(in->items[ii]);
+        }
+        esp_queue_dalist_8(self, in->len, vars);
+    } else if (MP_OBJ_IS_SMALL_INT(self->obj_instances[self->last])) {
+        if (!MP_OBJ_IS_SMALL_INT(add_obj)) {
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "pass an int only"));
+        }
+        printf("is small int\n");
+        esp_queue_daint_8(self, MP_OBJ_SMALL_INT_VALUE(add_obj));
+    }
+#endif
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_esp_queue_test_obj, mod_esp_queue_test);
 
 STATIC const mp_map_elem_t mod_esp_queue_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_put), (mp_obj_t)&mod_esp_queue_put_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get), (mp_obj_t)&mod_esp_queue_get_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_queue_test_obj },
 };
 STATIC MP_DEFINE_CONST_DICT(mod_esp_queue_locals_dict, mod_esp_queue_locals_dict_table);
 
