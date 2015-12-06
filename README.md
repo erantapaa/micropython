@@ -2,17 +2,17 @@ Rob's ESP extended port
 =======================
 Changes over upstream
 --------------------
-Interrupt drivern GPIO
-Full interrupt driven DHT22 temperature and humidity sensor.
-ESP SDK os task scheduling.
-Dallas 1 Wire protocol. (Soon to have interrupt driven notiifcation, such as conversion).
-I2C on any lines.
-Frozen code is all in the word addressable SPI rom. Byte level unpacking is supported.
-Mutexes using assembly language and a pythonwq wrapper.
-ESP OS timers.
-Updates tcp/ip (now stress tested over 100s of hourse and 100% stable so far).
+* Interrupt drivern GPIO
+* Full interrupt driven DHT22 temperature and humidity sensor.
+* ESP SDK os task scheduling.
+* Dallas 1 Wire protocol. (Soon to have interrupt driven notiifcation, such as conversion).
+* I2C on any lines.
+* Frozen code is all in the word addressable SPI rom. Byte level unpacking is supported.
+* Mutexes using assembly language and a pythonwq wrapper.
+* ESP OS timers.
+* Updates tcp/ip (now stress tested over 100s of hourse and 100% stable so far).
 
-Work in progress queuing between interrupt io and python user space.
+* Work in progress queuing between interrupt io and python user space.
 
 Notes
 -----
