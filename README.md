@@ -8,9 +8,9 @@ Changes over upstream
 * Dallas 1 Wire protocol. (Soon to have interrupt driven notiifcation, such as conversion).
 * I2C on any lines.
 * Frozen code is all in the word addressable SPI rom. Byte level unpacking is supported.
-* Mutexes using assembly language and a pythonwq wrapper.
+* Mutexes using assembly language and a python wrapper.
 * ESP OS timers.
-* Updates tcp/ip (now stress tested over 100s of hourse and 100% stable so far).
+* Updates tcp/ip (now stress tested over 100s of hours and 100% stable so far).
 
 * Work in progress queuing between interrupt io and python user space.
 
