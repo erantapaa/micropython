@@ -1,12 +1,22 @@
-[![Build Status][travis-img]][travis-repo] [![Coverage Status][coveralls-img]][coveralls-repo] [![Issue Stats][istats-pr-img]][istats-pr-repo] [![Issue Stats][istats-issue-img]][istats-issue-repo]
-[travis-img]:  https://travis-ci.org/micropython/micropython.png?branch=master
-[travis-repo]: https://travis-ci.org/micropython/micropython
-[coveralls-img]:  https://coveralls.io/repos/micropython/micropython/badge.png?branch=master
-[coveralls-repo]: https://coveralls.io/r/micropython/micropython?branch=master
-[istats-pr-img]: http://issuestats.com/github/micropython/micropython/badge/pr
-[istats-pr-repo]: http://issuestats.com/github/micropython/micropython
-[istats-issue-img]: http://issuestats.com/github/micropython/micropython/badge/issue
-[istats-issue-repo]: http://issuestats.com/github/micropython/micropython
+Rob's ESP extended port
+=======================
+Changes over upstream
+--------------------
+Interrupt drivern GPIO
+Full interrupt driven DHT22 temperature and humidity sensor.
+ESP SDK os task scheduling.
+Dallas 1 Wire protocol. (Soon to have interrupt driven notiifcation, such as conversion).
+I2C on any lines.
+Frozen code is all in the word addressable SPI rom. Byte level unpacking is supported.
+Mutexes using assembly language and a pythonwq wrapper.
+ESP OS timers.
+Updates tcp/ip (now stress tested over 100s of hourse and 100% stable so far).
+
+Work in progress queuing between interrupt io and python user space.
+
+Notes
+-----
+    Now building wih the 1.5 version of the ESP SDK.
 
 The MicroPython project
 =======================
