@@ -16,7 +16,7 @@ class TManager:
 
     def add_tq(self, name, value, post=False):
         if name not in self.actions:
-            self.actions[name] = esp.queue(5)
+            self.actions[name] = esp.queue(list(range(5)))
         self.actions[name].put(value)
         if post:
             self.os_task.post()

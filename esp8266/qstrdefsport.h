@@ -207,7 +207,7 @@ Q(one_wire)
 Q(reset)
 Q(suppress_skip)
 Q(power)
-Q(enable_int)
+Q(edge)
 
 Q(CONVERT_T)
 Q(READ_SCRATCH_PAD)
