@@ -13,6 +13,7 @@ typedef struct _esp_queue_obj_t {
 
 extern const mp_obj_type_t esp_queue_type;
 
-extern bool esp_queue_daint_8(esp_queue_obj_t *queue_in, uint8_t value);
-extern bool esp_queue_dalist_8(esp_queue_obj_t *queue_in, uint32_t len, uint8_t *vals);
+extern int8_t esp_queue_daint_8(esp_queue_obj_t *queue_in, uint8_t value);
+extern int8_t esp_queue_dalist_8(esp_queue_obj_t *queue_in, uint32_t len, uint8_t *vals);
+extern bool esp_queue_check_for_dalist_8(esp_queue_obj_t *queue_in);
 #endif // _INCLUDED_MOD_ESP_QUEUE_H_

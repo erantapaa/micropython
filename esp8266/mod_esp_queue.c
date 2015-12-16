@@ -110,41 +110,54 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_get(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_queue_get_obj, mod_esp_queue_get);
 
+bool esp_queue_check_for_dalist_8(esp_queue_obj_t *queue_in) {
+    mp_obj_t *inst = queue_in->obj_instances[queue_in->last];
+    if (!MP_OBJ_IS_TYPE(inst,  &mp_type_list)) {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "storage needs to be a list"));
+    } else {
+        mp_obj_list_t *al = (mp_obj_list_t *)inst;
+        if (!MP_OBJ_IS_SMALL_INT(al->items[0])) {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "not smallint"));
+        } 
+    }
+    return true;
+}
+
 // for use in interrupts
-bool esp_queue_dalist_8(esp_queue_obj_t *queue_in, uint32_t len, uint8_t *vals) {
+int8_t esp_queue_dalist_8(esp_queue_obj_t *queue_in, uint32_t len, uint8_t *vals) {
 	if (queue_in->items >= queue_in->max_items) {
         // printf("full\n");
-        return false;
+        return -1;
     } 
 
     mp_obj_t *inst = queue_in->obj_instances[queue_in->last];
     if (!MP_OBJ_IS_TYPE(inst,  &mp_type_list)) {
         // printf("not a list\n");
-        return false;
+        return -2;
     }
     mp_obj_list_t *al = (mp_obj_list_t *)inst;
     if (len > al->len) {
         // printf("too many values (%d) for list %d\n", len, al->len);
-        return false;
+        return -3;
     }
     for (int ii = 0; ii < len; ii++, vals++) {
         al->items[ii] = MP_OBJ_NEW_SMALL_INT(*vals); // WARNING: no checking, can explode, but unlikely as 8 bits in 
     }
     queue_in->items++;
     queue_in->last = (queue_in->last + 1) % queue_in->max_items;
-    return true;
+    return 0;
 }
 
 // for use in interrupts
-bool esp_queue_daint_8(esp_queue_obj_t *queue_in, uint8_t value) {
+int8_t esp_queue_daint_8(esp_queue_obj_t *queue_in, uint8_t value) {
 	if (queue_in->items >= queue_in->max_items) {
         // printf("full\n");
-        return false;
+        return -1;
     } 
     queue_in->obj_instances[queue_in->last] = MP_OBJ_NEW_SMALL_INT(value);
     queue_in->items++;
     queue_in->last = (queue_in->last + 1) % queue_in->max_items;
-    return true;
+    return 0;
 }
 
 
@@ -156,6 +169,7 @@ STATIC mp_obj_t mod_esp_queue_test(mp_obj_t self_in, mp_obj_t add_obj) {
     } 
 
     if (MP_OBJ_IS_TYPE(self->obj_instances[self->last],  &mp_type_list)) {
+        printf("list type of list\n");
         if (!MP_OBJ_IS_TYPE(add_obj,  &mp_type_list)) {
             nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "pass a list only"));
         }
@@ -167,6 +181,7 @@ STATIC mp_obj_t mod_esp_queue_test(mp_obj_t self_in, mp_obj_t add_obj) {
         }
         esp_queue_dalist_8(self, in->len, vars);
     } else if (MP_OBJ_IS_SMALL_INT(self->obj_instances[self->last])) {
+        printf("smallint type of list\n");
         if (!MP_OBJ_IS_SMALL_INT(add_obj)) {
             nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "pass an int only"));
         }

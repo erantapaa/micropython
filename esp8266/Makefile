@@ -11,8 +11,10 @@ MAKE_ESP_FROZEN = ../tools/make-esp-frozen.py
 
 SCRIPTDIR = scripts
 PORT = /dev/ttyUSB0
-# BAUD = 460800
-BAUD = 921600
+
+#BAUD = 9600
+BAUD = 460800
+# BAUD = 921600
 CROSS_COMPILE = xtensa-lx106-elf-
 ESP_SDK = $(shell $(CC) -print-sysroot)/usr
 ESP_DRIVER_LIB=/home/rfo/wa/esp/esp-open-sdk/sdk/examples/driver_lib

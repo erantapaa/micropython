@@ -54,8 +54,8 @@
 #include "utils.h"
 #include "mod_esp_gpio.h"
 #include "mod_esp_dht.h"
-#include "os_task.h"
 #include "mod_esp_mutex.h"
+#include "mod_esp_queue.h"
 
 
 #define TIME system_get_time
@@ -90,7 +90,7 @@ typedef struct _mp_obj_dht_t {
     uint16_t bits;
     uint8_t bytes[DHT_BYTES];
     uint8_t current[DHT_BYTES];
-    mp_obj_t task;
+    mp_obj_t queue;
     mp_obj_t mutex;
     uint32_t mutex_fail_count;
     bool spinwait;      // uSeconds to spin waiting for the mutex to unlock. Not used in the sender.
@@ -131,7 +131,7 @@ STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
     mp_obj_dht_t *dhto = m_new_obj(mp_obj_dht_t);
     dhto->base.type = &esp_dht_type;
     dhto->pmp = pmp;
-    dhto->task = mp_const_none;
+    dhto->queue = mp_const_none;
     dhto->mutex = mp_const_none;
     dhto->mserial = 0;
     dhto->filled = false;
@@ -160,12 +160,12 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
         esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
         mvalue = mutex->mutex  == 0 ? "acquired" : "released";
     }
-    mp_printf(print, "class_dht state=%d,error='%s', inters=%d, bits=%d, task=%x, fails=%d, mutex=%s, spinwait=%s, filled=%s, mserial=%d>\n",
+    mp_printf(print, "class_dht state=%d,error='%s', inters=%d, bits=%d, queue=%x, fails=%d, mutex=%s, spinwait=%s, filled=%s, mserial=%d>\n",
             self->state,
             self->error,
             self->inters,
             self->bits,
-            (unsigned)&self->task,
+            (unsigned)&self->queue,
             self->mutex_fail_count, 
             mvalue,
             self->spinwait ? "True" : "False",
@@ -184,7 +184,7 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
 
 STATIC const mp_arg_t esp_dht_init_args[] = {
     { MP_QSTR_pin, MP_ARG_REQUIRED | MP_ARG_INT },
-    { MP_QSTR_task, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
+    { MP_QSTR_queue, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
     { MP_QSTR_mutex, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
     { MP_QSTR_spinwait, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false} }
 };
@@ -200,10 +200,11 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
     mp_obj_dht_t *self  =  dht_new(pmp);
 
     if (vals[1].u_obj != mp_const_none) {
-        if (MP_OBJ_IS_TYPE(vals[1].u_obj, &esp_os_task_type)) {
-            self->task = vals[1].u_obj;
+        if (MP_OBJ_IS_TYPE(vals[1].u_obj, &esp_queue_type)) {
+            esp_queue_check_for_dalist_8((esp_queue_obj_t *)vals[1].u_obj);
+            self->queue = vals[1].u_obj;
         } else {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "task needs to be an esp.os_task type"));
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "queue needs to be an esp.os_queue type"));
         }
     } 
     if (vals[2].u_obj != mp_const_none) {
@@ -301,8 +302,8 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
                 esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
                 esp_release_mutex(&mutex->mutex);
             }
-            if (self->task != mp_const_none) {
-                system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self->task);
+            if (self->queue != mp_const_none) {
+                ; // system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self->task);
             }
             return 0;
         }
