@@ -165,7 +165,7 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
             self->error,
             self->inters,
             self->bits,
-            (unsigned)&self->queue,
+            (unsigned)self->queue,
             self->mutex_fail_count, 
             mvalue,
             self->spinwait ? "True" : "False",
@@ -201,8 +201,9 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
 
     if (vals[1].u_obj != mp_const_none) {
         if (MP_OBJ_IS_TYPE(vals[1].u_obj, &esp_queue_type)) {
-            esp_queue_check_for_dalist_8((esp_queue_obj_t *)vals[1].u_obj);
+            esp_queue_check_for_dalist_8((esp_queue_obj_t *)vals[1].u_obj, DHT_BYTES);
             self->queue = vals[1].u_obj;
+            printf("queue is %x\n", (unsigned)self->queue);
         } else {
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "queue needs to be an esp.os_queue type"));
         }
@@ -303,7 +304,8 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
                 esp_release_mutex(&mutex->mutex);
             }
             if (self->queue != mp_const_none) {
-                ; // system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self->task);
+                esp_queue_dalist_8(self->queue, DHT_BYTES, self->bytes);
+                // system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self->task);
             }
             return 0;
         }
@@ -429,7 +431,8 @@ STATIC const mp_map_elem_t dht_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_values), (mp_obj_t)&mod_esp_dht_values_obj},
     { MP_OBJ_NEW_QSTR(MP_QSTR_state), (mp_obj_t)&mod_esp_dht_state_obj},
     { MP_OBJ_NEW_QSTR(MP_QSTR_recv), (mp_obj_t)&mod_esp_dht_recv_obj},
-    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_dht_test_obj}
+    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_dht_test_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_DATA_SIZE), MP_OBJ_NEW_SMALL_INT(DHT_BYTES)}
 };
 
 STATIC MP_DEFINE_CONST_DICT(dht_locals_dict, dht_locals_dict_table);

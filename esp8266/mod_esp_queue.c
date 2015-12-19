@@ -110,12 +110,15 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_get(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_queue_get_obj, mod_esp_queue_get);
 
-bool ICACHE_FLASH_ATTR esp_queue_check_for_dalist_8(esp_queue_obj_t *queue_in) {
+bool ICACHE_FLASH_ATTR esp_queue_check_for_dalist_8(esp_queue_obj_t *queue_in, uint32_t len) {
     mp_obj_t *inst = queue_in->obj_instances[queue_in->last];
     if (!MP_OBJ_IS_TYPE(inst,  &mp_type_list)) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "storage needs to be a list"));
     } else {
         mp_obj_list_t *al = (mp_obj_list_t *)inst;
+        if (al->len < len) {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "queue data is too small"));
+        }
         if (!MP_OBJ_IS_SMALL_INT(al->items[0])) {
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "not smallint"));
         } 
@@ -196,7 +199,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_esp_queue_test_obj, mod_esp_queue_test);
 STATIC const mp_map_elem_t mod_esp_queue_locals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_put), (mp_obj_t)&mod_esp_queue_put_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_get), (mp_obj_t)&mod_esp_queue_get_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_queue_test_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_queue_test_obj }
 };
 STATIC MP_DEFINE_CONST_DICT(mod_esp_queue_locals_dict, mod_esp_queue_locals_dict_table);
 

@@ -184,6 +184,7 @@ Q(task)
 Q(spinwait)
 Q(test)
 Q(consume)
+Q(DATA_SIZE)
 
 // mod_esp_mutex
 Q(mutex)
