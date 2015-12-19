@@ -110,7 +110,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_get(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_queue_get_obj, mod_esp_queue_get);
 
-bool esp_queue_check_for_dalist_8(esp_queue_obj_t *queue_in) {
+bool ICACHE_FLASH_ATTR esp_queue_check_for_dalist_8(esp_queue_obj_t *queue_in) {
     mp_obj_t *inst = queue_in->obj_instances[queue_in->last];
     if (!MP_OBJ_IS_TYPE(inst,  &mp_type_list)) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "storage needs to be a list"));
@@ -123,7 +123,7 @@ bool esp_queue_check_for_dalist_8(esp_queue_obj_t *queue_in) {
     return true;
 }
 
-// for use in interrupts
+// for use in interrupts no ICACHE_FLASH_ATTR!
 int8_t esp_queue_dalist_8(esp_queue_obj_t *queue_in, uint32_t len, uint8_t *vals) {
 	if (queue_in->items >= queue_in->max_items) {
         // printf("full\n");
@@ -161,7 +161,7 @@ int8_t esp_queue_daint_8(esp_queue_obj_t *queue_in, uint8_t value) {
 }
 
 
-STATIC mp_obj_t mod_esp_queue_test(mp_obj_t self_in, mp_obj_t add_obj) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_test(mp_obj_t self_in, mp_obj_t add_obj) {
 #if 1
     esp_queue_obj_t *self = self_in;
 	if (self->items >= self->max_items) {

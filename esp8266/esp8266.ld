@@ -100,15 +100,7 @@ SECTIONS
         *utils.o(.literal* .text*)
         *printf.o(.literal* .text*)
 
-        *esp_1wire.o(.literal* .text*)
-        *esp_i2c_master.o(.literal* .text*)
         *esp_irom.o(.literal* .text*)
-        *mod_esp_1wire.o(.literal* .text*)
-        *mod_esp_dht.o(.literal* .text*)
-        *mod_esp_gpio.o(.literal* .text*)
-        *mod_esp_I2C.o(.literal* .text*)
-        *mod_esp_mutex.o(.literal* .text*)
-        *mod_esp_queue.o(.literal* .text*)
 
         /* we put as much rodata as possible in this section */
         /* note that only rodata accessed as a machine word is allowed here */
