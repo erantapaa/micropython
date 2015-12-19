@@ -184,7 +184,10 @@ void mp_delete_global(qstr qst) {
 mp_obj_t mp_unary_op(mp_uint_t op, mp_obj_t arg) {
     DEBUG_OP_printf("unary " UINT_FMT " %p\n", op, arg);
 
-    if (MP_OBJ_IS_SMALL_INT(arg)) {
+    if (op == MP_UNARY_OP_NOT) {
+        // "not x" is the negative of whether "x" is true per Python semantics
+        return mp_obj_new_bool(mp_obj_is_true(arg) == 0);
+    } else if (MP_OBJ_IS_SMALL_INT(arg)) {
         mp_int_t val = MP_OBJ_SMALL_INT_VALUE(arg);
         switch (op) {
             case MP_UNARY_OP_BOOL:
@@ -934,6 +937,11 @@ void mp_convert_member_lookup(mp_obj_t self, const mp_obj_type_t *type, mp_obj_t
         dest[0] = ((mp_obj_static_class_method_t*)MP_OBJ_TO_PTR(member))->fun;
     } else if (MP_OBJ_IS_TYPE(member, &mp_type_classmethod)) {
         // return a bound method, with self being the type of this object
+        // this type should be the type of the original instance, not the base
+        // type (which is what is passed in the 'type' argument to this function)
+        if (self != MP_OBJ_NULL) {
+            type = mp_obj_get_type(self);
+        }
         dest[0] = ((mp_obj_static_class_method_t*)MP_OBJ_TO_PTR(member))->fun;
         dest[1] = MP_OBJ_FROM_PTR(type);
     } else if (MP_OBJ_IS_TYPE(member, &mp_type_type)) {
@@ -1296,6 +1304,8 @@ void mp_import_all(mp_obj_t module) {
     }
 }
 
+#if MICROPY_ENABLE_COMPILER
+
 // this is implemented in this file so it can optimise access to locals/globals
 mp_obj_t mp_parse_compile_execute(mp_lexer_t *lex, mp_parse_input_kind_t parse_input_kind, mp_obj_dict_t *globals, mp_obj_dict_t *locals) {
     // save context
@@ -1333,6 +1343,8 @@ mp_obj_t mp_parse_compile_execute(mp_lexer_t *lex, mp_parse_input_kind_t parse_i
         nlr_jump(nlr.ret_val);
     }
 }
+
+#endif // MICROPY_ENABLE_COMPILER
 
 void *m_malloc_fail(size_t num_bytes) {
     DEBUG_printf("memory allocation failed, allocating " UINT_FMT " bytes\n", num_bytes);

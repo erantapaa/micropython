@@ -401,10 +401,8 @@ int main(int argc, char **argv) {
 
     mp_init();
 
-    #ifndef _WIN32
     // create keyboard interrupt object
     MP_STATE_VM(keyboard_interrupt_obj) = mp_obj_new_exception(&mp_type_KeyboardInterrupt);
-    #endif
 
     char *home = getenv("HOME");
     char *path = getenv("MICROPYPATH");
@@ -524,8 +522,10 @@ int main(int argc, char **argv) {
                 break;
             } else if (strcmp(argv[a], "-X") == 0) {
                 a += 1;
+            #if MICROPY_DEBUG_PRINTERS
             } else if (strcmp(argv[a], "-v") == 0) {
                 mp_verbose_flag++;
+            #endif
             } else if (strncmp(argv[a], "-O", 2) == 0) {
                 if (unichar_isdigit(argv[a][2])) {
                     MP_STATE_VM(mp_optimise_value) = argv[a][2] & 0xf;

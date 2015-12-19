@@ -232,8 +232,11 @@ Q(len)
 Q(list)
 Q(locals)
 Q(map)
+#if MICROPY_PY_BUILTINS_MIN_MAX
 Q(max)
 Q(min)
+Q(default)
+#endif
 Q(namedtuple)
 Q(next)
 Q(oct)
@@ -610,7 +613,7 @@ Q(b2a_base64)
 #endif
 
 #if MICROPY_PY_MACHINE
-Q(machine)
+Q(umachine)
 Q(mem)
 Q(mem8)
 Q(mem16)

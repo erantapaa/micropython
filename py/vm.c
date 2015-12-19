@@ -760,14 +760,6 @@ unwind_jump:;
                     //sp -= 3; // pop 3 exception values
                     DISPATCH();
 
-                ENTRY(MP_BC_NOT):
-                    if (TOP() == mp_const_true) {
-                        SET_TOP(mp_const_false);
-                    } else {
-                        SET_TOP(mp_const_true);
-                    }
-                    DISPATCH();
-
                 ENTRY(MP_BC_BUILD_TUPLE): {
                     MARK_EXC_IP_SELECTIVE();
                     DECODE_UINT;
@@ -981,7 +973,7 @@ unwind_jump:;
 
                         mp_uint_t n_args = unum & 0xff;
                         mp_uint_t n_kw = (unum >> 8) & 0xff;
-                        int adjust = (sp[1] == NULL) ? 0 : 1;
+                        int adjust = (sp[1] == MP_OBJ_NULL) ? 0 : 1;
 
                         mp_code_state *new_state = mp_obj_fun_bc_prepare_codestate(*sp, n_args + adjust, n_kw, sp + 2 - adjust);
                         if (new_state) {
@@ -1230,7 +1222,7 @@ yield:
                     } else if (ip[-1] < MP_BC_STORE_FAST_MULTI + 16) {
                         fastn[MP_BC_STORE_FAST_MULTI - (mp_int_t)ip[-1]] = POP();
                         DISPATCH();
-                    } else if (ip[-1] < MP_BC_UNARY_OP_MULTI + 6) {
+                    } else if (ip[-1] < MP_BC_UNARY_OP_MULTI + 7) {
                         SET_TOP(mp_unary_op(ip[-1] - MP_BC_UNARY_OP_MULTI, TOP()));
                         DISPATCH();
                     } else if (ip[-1] < MP_BC_BINARY_OP_MULTI + 36) {
