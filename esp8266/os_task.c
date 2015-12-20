@@ -45,7 +45,7 @@ STATIC os_event_t sensor_evt_queue[16];
 
 STATIC ICACHE_FLASH_ATTR void esp_os_task_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     esp_os_task_obj_t *self = self_in;
-    printf("os_task(callback=%x)\n", (unsigned int)self->callback);
+    mp_printf(print, "os_task(callback=%x)", (unsigned int)self->callback);
 }
 
 STATIC ICACHE_FLASH_ATTR void task_common_callback(os_event_t *evt) {
