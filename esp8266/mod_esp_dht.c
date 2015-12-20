@@ -54,15 +54,10 @@
 #include "utils.h"
 #include "mod_esp_gpio.h"
 #include "mod_esp_dht.h"
-#include "mod_esp_mutex.h"
 #include "mod_esp_queue.h"
 
 
 #define TIME system_get_time
-
-#define RAISE_ERRNO(err_flag, error_val) \
-    { if (err_flag == -1) \
-        { nlr_raise(mp_obj_new_exception_arg1(&mp_type_OSError, MP_OBJ_NEW_SMALL_INT(error_val))); } }
 
 extern void ets_timer_disarm(ETSTimer *ptimer);
 extern void ets_timer_setfn(ETSTimer *ptimer, ETSTimerFunc *pfunction, void *parg);
@@ -82,18 +77,14 @@ typedef struct _mp_obj_dht_t {
     mp_obj_base_t base;
     pmap_t *pmp;
     int state;
-    char *error;
     os_timer_t timer;
     uint32_t start;
     uint32_t inters;
     uint32_t last_read_time;    // last read time used to time the interrupts
     uint16_t bits;
     uint8_t bytes[DHT_BYTES];
-    uint8_t current[DHT_BYTES];
     mp_obj_t queue;
-    mp_obj_t mutex;
-    uint32_t mutex_fail_count;
-    bool spinwait;      // uSeconds to spin waiting for the mutex to unlock. Not used in the sender.
+    bool spinwait;      // spin in a loop for initial packet if true, otherwise use a timer
     bool filled;        // data is available
     uint32_t mserial;
 } mp_obj_dht_t;
@@ -119,9 +110,7 @@ STATIC void    ICACHE_FLASH_ATTR dhtx_reset_values(mp_obj_dht_t *self) {
     self->inters = 0;
     self->bits = 0;
     self->state = DHT_STATE_NEW;
-    self->error = "None";
     self->last_read_time = 0;
-    self->mutex_fail_count = 0;
     memset(self->bytes, 0, DHT_BYTES);
 }
 
@@ -132,7 +121,6 @@ STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
     dhto->base.type = &esp_dht_type;
     dhto->pmp = pmp;
     dhto->queue = mp_const_none;
-    dhto->mutex = mp_const_none;
     dhto->mserial = 0;
     dhto->filled = false;
     dhtx_reset_values(dhto);
@@ -140,43 +128,21 @@ STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
     return dhto;
 }
 
-#define BYTETOBINARYPATTERN "%d%d%d%d%d%d%d%d"
-#define BYTETOBINARY(byte)  \
-  (byte & 0x80 ? 1 : 0), \
-  (byte & 0x40 ? 1 : 0), \
-  (byte & 0x20 ? 1 : 0), \
-  (byte & 0x10 ? 1 : 0), \
-  (byte & 0x08 ? 1 : 0), \
-  (byte & 0x04 ? 1 : 0), \
-  (byte & 0x02 ? 1 : 0), \
-  (byte & 0x01 ? 1 : 0)
-
 STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     (void)kind;
     mp_obj_dht_t *self = self_in;
     const char *mvalue = "None";
 
-    if (self->mutex != mp_const_none) {
-        esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
-        mvalue = mutex->mutex  == 0 ? "acquired" : "released";
-    }
-    mp_printf(print, "class_dht state=%d,error='%s', inters=%d, bits=%d, queue=%x, fails=%d, mutex=%s, spinwait=%s, filled=%s, mserial=%d>\n",
+    char *q_set = self->queue == mp_const_none ? "No" : "Yes";
+    mp_printf(print, "class_dht state=%d, inters=%d, bits=%d, queue=%s, fails=%d, filled=%s, mserial=%d>\n",
             self->state,
-            self->error,
             self->inters,
             self->bits,
-            (unsigned)self->queue,
-            self->mutex_fail_count, 
+            q_set,
             mvalue,
-            self->spinwait ? "True" : "False",
             self->filled ? "True" : "False",
             self->mserial);
 
-#if 0
-    for (int ii = 0; ii < DHT_BYTES; ii++) {
-        printf("%d,\'%2x\',%u,\'"BYTETOBINARYPATTERN"\'\n", ii, self->bytes[ii], self->bytes[ii], BYTETOBINARY(self->bytes[ii]));
-    }
-#endif
     mp_printf(print, "%d %d %d = %d", self->bytes[0] * 256 + self->bytes[1],
                     self->bytes[2] * 256 + self->bytes[3],
                     (self->bytes[0] + self->bytes[1] + self->bytes[2] + self->bytes[3]) & 0xFF, self->bytes[4]);
@@ -185,8 +151,7 @@ STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_i
 STATIC const mp_arg_t esp_dht_init_args[] = {
     { MP_QSTR_pin, MP_ARG_REQUIRED | MP_ARG_INT },
     { MP_QSTR_queue, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
-    { MP_QSTR_mutex, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none} },
-    { MP_QSTR_spinwait, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false} }
+    { MP_QSTR_spinwait,  MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = false} }
 };
 #define ESP_DHT_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_dht_init_args)
 
@@ -208,14 +173,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "queue needs to be an esp.os_queue type"));
         }
     } 
-    if (vals[2].u_obj != mp_const_none) {
-        if (MP_OBJ_IS_TYPE(vals[2].u_obj, &esp_mutex_type)) {
-            self->mutex = vals[2].u_obj;
-        } else {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "mutex needs to be an esp.mutex type"));
-        }
-    } 
-    self->spinwait = vals[3].u_bool;
+    self->spinwait = vals[2].u_bool;
     // TODO: move these to the esp_gpio module
     GPIO_REG_WRITE(GPIO_ENABLE_W1TS_ADDRESS, (1<<gpio_pin)); // Enable output, is this needed?
     gpio_pin_intr_state_set(GPIO_ID_PIN(pmp->pin), GPIO_PIN_INTR_ANYEDGE);  
@@ -223,9 +181,6 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
     return self;
 }
 
-
-// don't try macros like this at home 
-#define  dht_error(dht, error_str) dht->error = error_str, dht->state = DHT_ERROR; return -1
 
 STATIC uint32 mserial = 0;
 
@@ -246,35 +201,41 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
         return -1;
     case DHT_STATE_SPL:     // from SPL -> SPH now high, previous low was for 80uS, -> expecting 80 uS high
         if (signal != HIGH) {
-            dht_error(self, "wrong state from SPL");
+            self->state = DHT_ERROR;
+            return -1;
         }
         self->state = DHT_STATE_SPH; // no timer here because we are from outside the interrupt handler here (usually about 68uS)
         break;
     case DHT_STATE_SPH:
         if (signal != LOW) {
-            dht_error(self, "wrong state from SPL");
+            self->state = DHT_ERROR;
+            return -1;
         }
         if (elapsed > 70 && elapsed < 90) { // nominal 81
             self->state = DHT_STATE_DATA_START;
         } else {
-            dht_error(self, "wrong START");
+            self->state = DHT_ERROR;
+            return -1;
         }
         break;
     case DHT_STATE_DATA_START:  // been in high from sensor pulled high or previous data bit, now in low for 50uS
         if (signal != HIGH) {
-            dht_error(self, "wrong state from sensor  in DATA START");
+            self->state = DHT_ERROR;
+            return -1;
         }
         if (elapsed > 45 && elapsed <= 55) {
             self->state = DHT_STATE_DATA_DATA;
         } else if (elapsed > 55 && elapsed < 80) {     // word end
             self->state = DHT_STATE_DATA_DATA;
         } else {
-            dht_error(self, "wrong DATA START time");
+            self->state = DHT_ERROR;
+            return -1;
         }
         break;
     case DHT_STATE_DATA_DATA:
         if (signal != LOW) {
-            dht_error(self, "wrong state from sensor in DATA DATA");
+            self->state = DHT_ERROR;
+            return -1;
         }
         if (elapsed >= 20 && elapsed <= 30) {
             self->state = DHT_STATE_DATA_START;
@@ -284,25 +245,13 @@ STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
             self->bytes[self->bits >> 3] |= 1 << (7 - (self->bits & 7));
             self->bits++;
         } else {
-            dht_error(self, "bad data size");
+            self->state = DHT_ERROR;
+            return -1;
         }
         if (self->bits == 40) {
             self->state = DHT_STATE_ENDED;
-            // aquire mutex if one was provided
-            if (self->mutex != mp_const_none) {
-                esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
-                if (!esp_acquire_mutex(&mutex->mutex)) {
-                    self->mutex_fail_count++;
-                    return 1;
-                }
-            } 
-            memcpy(self->current, self->bytes, DHT_BYTES);
             self->mserial = mserial++;
             self->filled = true;
-            if (self->mutex != mp_const_none) {
-                esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
-                esp_release_mutex(&mutex->mutex);
-            }
             if (self->queue != mp_const_none) {
                 esp_queue_dalist_8(self->queue, DHT_BYTES, self->bytes);
                 // system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self->task);
@@ -361,23 +310,16 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_dht_values(mp_uint_t n_args, const mp_
 
     mp_obj_t tuple[DHT_BYTES];
     
-    if (self->mutex != mp_const_none) {
-        acquire_or_raise(self->mutex);
-    }
     bool got_values = false;
 
     if (self->filled == true) {
         for (int ii = 0; ii < DHT_BYTES; ii++) {
-            tuple[ii] = mp_obj_new_int(self->current[ii]);
+            tuple[ii] = mp_obj_new_int(self->bytes[ii]);
         }
         if (consume == true) {
             self->filled = false;
         }
         got_values = true;
-    }
-    if (self->mutex != mp_const_none) {
-        esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
-        esp_release_mutex(&mutex->mutex);
     }
     if (!got_values) {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_LookupError, "No data"));
@@ -411,27 +353,17 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t l
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_recv_obj, mod_esp_dht_recv);
 
 STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_test(mp_obj_t self_in, mp_obj_t len_in) {
-    mp_obj_dht_t *self = self_in;
-    if (self->mutex != mp_const_none) {
-        esp_mutex_obj_t *mutex = (esp_mutex_obj_t *)self->mutex;
-        printf("mutex value is %d\n", mutex->mutex);
-        if (!esp_acquire_mutex(&mutex->mutex)) {
-            printf("Failed acquire\n");
-            return mp_const_none;
-        }
-        esp_release_mutex(&mutex->mutex);
-    }
+    // mp_obj_dht_t *self = self_in;
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_test_obj, mod_esp_dht_test);
 
 
 STATIC const mp_map_elem_t dht_locals_dict_table[] = {
-//    { MP_OBJ_NEW_QSTR(MP_QSTR___del__), (mp_obj_t)&mod_esp_dht___del___obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_values), (mp_obj_t)&mod_esp_dht_values_obj},
-    { MP_OBJ_NEW_QSTR(MP_QSTR_state), (mp_obj_t)&mod_esp_dht_state_obj},
-    { MP_OBJ_NEW_QSTR(MP_QSTR_recv), (mp_obj_t)&mod_esp_dht_recv_obj},
-    { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_dht_test_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_values), (mp_obj_t)&mod_esp_dht_values_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_state), (mp_obj_t)&mod_esp_dht_state_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_recv), (mp_obj_t)&mod_esp_dht_recv_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_dht_test_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_DATA_SIZE), MP_OBJ_NEW_SMALL_INT(DHT_BYTES)}
 };
 

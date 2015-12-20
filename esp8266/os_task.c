@@ -49,10 +49,9 @@ STATIC ICACHE_FLASH_ATTR void esp_os_task_print(const mp_print_t *print, mp_obj_
 }
 
 STATIC ICACHE_FLASH_ATTR void task_common_callback(os_event_t *evt) {
-    // esp_os_task_obj_t *self = (esp_os_task_obj_t *)evt->par;
     esp_os_task_obj_t *self = (esp_os_task_obj_t *)evt->par;
 
-    if (self->callback) {
+    if (self->callback != mp_const_none) {
         nlr_buf_t nlr;
         if (nlr_push(&nlr) == 0) {
             (void)mp_call_function_1(self->callback, self);
@@ -100,7 +99,6 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(esp_os_task_handler_obj, esp_os_task_handler);
 
 
 STATIC const mp_map_elem_t esp_os_task_locals_dict_table[] = {
-//    { MP_OBJ_NEW_QSTR(MP_QSTR_cancel), (mp_obj_t)&esp_os_timer_cancel_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_post), (mp_obj_t)&esp_os_task_post_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_handler), (mp_obj_t)&esp_os_task_handler_obj },
 };

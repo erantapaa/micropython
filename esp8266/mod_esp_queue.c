@@ -38,6 +38,7 @@
 #include "utils.h"
 #include "user_interface.h"
 
+#include "os_task.h"
 #include "mod_esp_mutex.h"
 #include "mod_esp_queue.h"
 
@@ -51,7 +52,8 @@ STATIC ICACHE_FLASH_ATTR void mod_esp_queue_print(const mp_print_t *print, mp_ob
 
 STATIC const mp_arg_t mod_esp_queue_init_args[] = {
     {MP_QSTR_storage, MP_ARG_REQUIRED | MP_ARG_OBJ},
-    {MP_QSTR_mutex, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none}}
+    {MP_QSTR_mutex, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none}},
+    {MP_QSTR_os_task, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = mp_const_none}}
 };
 #define ESP_MUTEX_INIT_NUM_ARGS MP_ARRAY_SIZE(mod_esp_queue_init_args)
 
@@ -73,11 +75,21 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_make_new(mp_obj_t type_in, mp_ui
     self->obj_instances = list->items;
     if (vals[1].u_obj != mp_const_none) {
         if (MP_OBJ_IS_TYPE(vals[1].u_obj, &esp_mutex_type)) {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "mutex is not coded yet"));
             self->mutex = vals[1].u_obj;
         } else {
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "mutex needs to be an esp.mutex type"));
         }
+    } else {
+        self->mutex = mp_const_none;
+    }
+    if (vals[2].u_obj != mp_const_none) {
+        if (MP_OBJ_IS_TYPE(vals[2].u_obj, &esp_os_task_type)) {
+            self->os_task = vals[2].u_obj;
+        } else {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "os_task needs to be an esp.os_task type"));
+        }
+    } else {
+        self->os_task = mp_const_none;
     }
     return (mp_obj_t)self;
 }

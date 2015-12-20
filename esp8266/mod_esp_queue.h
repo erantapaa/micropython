@@ -4,6 +4,7 @@
 typedef struct _esp_queue_obj_t {
     mp_obj_base_t base;
     mp_obj_t mutex;
+    mp_obj_t os_task;
 	int first;
 	int last;
 	int items;
