@@ -104,6 +104,9 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_put(mp_obj_t self_in, mp_obj_t a
     self->items++;
     self->obj_instances[self->last] = add_obj;
     self->last = (self->last + 1) % self->max_items;
+    if (self->os_task != mp_const_none) {
+        system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self->os_task);
+    }
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_esp_queue_put_obj, mod_esp_queue_put);
@@ -160,6 +163,9 @@ int8_t esp_queue_dalist_8(esp_queue_obj_t *queue_in, uint32_t len, uint8_t *vals
     }
     queue_in->items++;
     queue_in->last = (queue_in->last + 1) % queue_in->max_items;
+    if (queue_in->os_task != mp_const_none) {
+        system_os_post(SENSOR_TASK_ID, 1, (os_param_t)queue_in->os_task);
+    }
     return 0;
 }
 
@@ -172,6 +178,9 @@ int8_t esp_queue_daint_8(esp_queue_obj_t *queue_in, uint8_t value) {
     queue_in->obj_instances[queue_in->last] = MP_OBJ_NEW_SMALL_INT(value);
     queue_in->items++;
     queue_in->last = (queue_in->last + 1) % queue_in->max_items;
+    if (queue_in->os_task != mp_const_none) {
+        system_os_post(SENSOR_TASK_ID, 1, (os_param_t)queue_in->os_task);
+    }
     return 0;
 }
 

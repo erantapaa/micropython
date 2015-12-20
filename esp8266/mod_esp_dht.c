@@ -131,15 +131,14 @@ STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
 STATIC void ICACHE_FLASH_ATTR dht_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     (void)kind;
     mp_obj_dht_t *self = self_in;
-    const char *mvalue = "None";
 
     char *q_set = self->queue == mp_const_none ? "No" : "Yes";
-    mp_printf(print, "class_dht state=%d, inters=%d, bits=%d, queue=%s, fails=%d, filled=%s, mserial=%d>\n",
+    mp_printf(print, "class_dht state=%d, inters=%d, bits=%d, queue=%s, mserial=%d, filled=%s, mserial=%d>\n",
             self->state,
             self->inters,
             self->bits,
             q_set,
-            mvalue,
+            self->mserial,
             self->filled ? "True" : "False",
             self->mserial);
 
@@ -168,7 +167,6 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
         if (MP_OBJ_IS_TYPE(vals[1].u_obj, &esp_queue_type)) {
             esp_queue_check_for_dalist_8((esp_queue_obj_t *)vals[1].u_obj, DHT_BYTES);
             self->queue = vals[1].u_obj;
-            printf("queue is %x\n", (unsigned)self->queue);
         } else {
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "queue needs to be an esp.os_queue type"));
         }
