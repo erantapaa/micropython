@@ -41,7 +41,7 @@ CFLAGS = $(INC) -Wall -Wpointer-arith -Werror -ansi -std=gnu99 -nostdlib -DUART_
 	$(CFLAGS_XTENSA) $(COPT)
 
 LDFLAGS = -nostdlib -T esp8266.ld -Map=$(@:.elf=.map) --cref
-LIBS = -L$(ESP_SDK)/lib -lmain -ljson -llwip -lpp -lnet80211 -lwpa -lphy -lnet80211 -lcrypto
+LIBS = -L$(ESP_SDK)/lib -lmain -ljson -llwip -lpp -lnet80211 -lwpa -lphy -lnet80211 -lcrypto -lsmartconfig
 
 LIBGCC_FILE_NAME = $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 LIBS += -L$(dir $(LIBGCC_FILE_NAME)) -lgcc
@@ -77,11 +77,12 @@ SRC_C = \
 	mod_esp_gpio.c \
 	mod_esp_dht.c \
 	mod_esp_mutex.c \
+	esp_i2c_master.c \
 	mod_esp_I2C.c \
+	esp_1wire.c \
 	mod_esp_1wire.c \
 	esp_irom.c \
-	esp_i2c_master.c \
-	esp_1wire.c \
+	mod_esp_smartconfig.c \
 	rofl.c \
 	$(BUILD)/esp_frozen.c 
 

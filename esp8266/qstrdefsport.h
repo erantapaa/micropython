@@ -227,3 +227,7 @@ Q(put)
 Q(get)
 Q(in_place)
 Q(storage)
+
+// smartconfig
+Q(smartconfig)
+Q(run)
