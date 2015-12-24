@@ -114,7 +114,7 @@ STATIC void    ICACHE_FLASH_ATTR dhtx_reset_values(mp_obj_dht_t *self) {
     memset(self->bytes, 0, DHT_BYTES);
 }
 
-STATIC int dhtx(void *args, uint32_t now, uint8_t signal);
+STATIC int16_t dhtx(pmap_t *pmp, uint32_t now, uint8_t signal);
 
 STATIC mp_obj_dht_t ICACHE_FLASH_ATTR *dht_new(pmap_t *pmp) {
     mp_obj_dht_t *dhto = m_new_obj(mp_obj_dht_t);
@@ -182,9 +182,9 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_arg
 
 STATIC uint32 mserial = 0;
 
-STATIC int dhtx(void *args, uint32_t now, uint8_t signal)
+STATIC int16_t dhtx(pmap_t *pmp, uint32_t now, uint8_t signal)
 {
-    mp_obj_dht_t *self = (mp_obj_dht_t *)(args);
+    mp_obj_dht_t *self = (mp_obj_dht_t *)(pmp->data);
     uint32_t elapsed = now - self->start;
 
     self->start = now;

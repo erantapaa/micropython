@@ -54,6 +54,54 @@ uint32_t flash_size(void) {
 #include "mod_esp_gpio.h"
 #include "esp_1wire.h"
 
+#include "smartconfig.h"
+
+void ICACHE_FLASH_ATTR
+smartconfig_done(sc_status status, void *pdata)
+{
+    switch(status) {
+        case SC_STATUS_WAIT:
+            printf("SC_STATUS_WAIT\n");
+            break;
+        case SC_STATUS_FIND_CHANNEL:
+            printf("SC_STATUS_FIND_CHANNEL\n");
+            break;
+        case SC_STATUS_GETTING_SSID_PSWD:
+            printf("SC_STATUS_GETTING_SSID_PSWD\n");
+			sc_type *type = pdata;
+            if (*type == SC_TYPE_ESPTOUCH) {
+                printf("SC_TYPE:SC_TYPE_ESPTOUCH\n");
+            } else {
+                printf("SC_TYPE:SC_TYPE_AIRKISS\n");
+            }
+            break;
+        case SC_STATUS_LINK:
+            printf("SC_STATUS_LINK\n");
+            struct station_config *sta_conf = pdata;
+
+            printf("name: \"%s\"\n", sta_conf->ssid);
+            printf("pass: \"%s\"\n", sta_conf->password);
+            printf("bssid_set: %u\n", sta_conf->bssid_set);
+            printf("bssid: \"%s\"\n", sta_conf->bssid);
+
+	        wifi_station_set_config(sta_conf);
+	        wifi_station_disconnect();
+	        wifi_station_connect();
+            break;
+        case SC_STATUS_LINK_OVER:
+            printf("SC_STATUS_LINK_OVER\n");
+            if (pdata != NULL) {
+                uint8 phone_ip[4] = {0};
+
+                memcpy(phone_ip, (uint8*)pdata, 4);
+                printf("Phone ip: %d.%d.%d.%d\n",phone_ip[0],phone_ip[1],phone_ip[2],phone_ip[3]);
+            }
+            smartconfig_stop();
+            break;
+    }
+	
+}
+
 static pmap_t *gpio;
 #define MAXI    10
 
@@ -61,6 +109,18 @@ void rofl(const char *arg, int arg2) {
     uint8_t arr[MAXI];
 
     switch (arg[0]) {
+    case 'v':
+        printf("SDK version:%x '%s'\n", (unsigned)system_get_sdk_version(), system_get_sdk_version());
+        break;
+    case 'V':
+        printf("chip version: %x '%d'\n", (unsigned)system_get_chip_id(), system_get_chip_id());
+        break;
+    case 'x':
+        printf("SDK version:%s\n", system_get_sdk_version());
+        smartconfig_set_type(SC_TYPE_ESPTOUCH); //SC_TYPE_ESPTOUCH,SC_TYPE_AIRKISS,SC_TYPE_ESPTOUCH_AIRKISS
+        wifi_set_opmode(STATION_MODE);
+        smartconfig_start(smartconfig_done);
+        break;
     case 'i':
         gpio = ds_init(5);
         break;

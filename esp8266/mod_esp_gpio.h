@@ -28,7 +28,6 @@
 #define _INCLUDED_MOD_ESP_GPIO_H_
 // extern const mp_obj_type_t esp_os_timer_type;
 
-typedef int (*isr_t)(void *, uint32_t now, uint8_t signal);
 
 typedef struct {
     bool level;
@@ -39,18 +38,23 @@ typedef struct pmap_s {
     uint16_t pin;
     uint32_t periph;
     uint16_t func;
-    isr_t isr;
+//    isr_t isr;
+    int16_t (*isr)(struct pmap_s *pmp, uint32_t now, uint8_t signal);
     void *data;
-    int last_result;
+    int16_t last_result;
     event_t *events;
     uint16_t ecount;
     uint16_t n_events;
     uint32_t start_time;
+
+    uint16_t debounce;
+    uint32_t btimer_start;
 } pmap_t;
 
+typedef int16_t (*isr_t)(pmap_t *pmp, uint32_t now, uint8_t signal);
 
 extern pmap_t *pmap(int inpin);
-extern void ICACHE_FLASH_ATTR esp_gpio_isr_attach(pmap_t *pmp, isr_t vect, void *data, uint16_t n_events);
+extern void ICACHE_FLASH_ATTR esp_gpio_isr_attach(pmap_t *pmp, isr_t isr, void *data, uint16_t n_events);
 extern bool ICACHE_FLASH_ATTR esp_gpio_isr_detach(uint8_t pin);
 extern void ICACHE_FLASH_ATTR esp_gpio_init();
 

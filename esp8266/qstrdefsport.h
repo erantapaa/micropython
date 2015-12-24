@@ -167,6 +167,9 @@ Q(json)
 
 // mod_esp_gpio
 Q(print)
+Q(attach)
+Q(debounce)
+
 // Q(toggle)
 Q(gpio)
 Q(INTR_DISABLE)

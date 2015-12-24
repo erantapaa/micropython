@@ -53,6 +53,7 @@
 #include "os_type.h"
 #include "utils.h"
 #include "mod_esp_gpio.h"
+#include "mod_esp_queue.h"
 
 extern void *pvPortMalloc(size_t xWantedSize, const char *file, const char *line);
 
@@ -64,18 +65,18 @@ extern void *pvPortMalloc(size_t xWantedSize, const char *file, const char *line
 
 
 STATIC pmap_t pin_map[] = {
-    {0, PERIPHS_IO_MUX_GPIO0_U, FUNC_GPIO0, NULL, NULL, 0, NULL, 0, 0, -1}, 
-    {1, PERIPHS_IO_MUX_U0TXD_U, FUNC_GPIO1, NULL, NULL, 0, NULL, 0, 0, -1},
-    {2, PERIPHS_IO_MUX_GPIO2_U, FUNC_GPIO2, NULL, NULL, 0, NULL, 0, 0, -1},
-    {3, PERIPHS_IO_MUX_U0RXD_U, FUNC_GPIO3, NULL, NULL, 0, NULL, 0, 0, -1},
-    {4, PERIPHS_IO_MUX_GPIO4_U, FUNC_GPIO4, NULL, NULL, 0, NULL, 0, 0, -1},
-    {5, PERIPHS_IO_MUX_GPIO5_U, FUNC_GPIO5, NULL, NULL, 0, NULL, 0, 0, -1},
+    {0, PERIPHS_IO_MUX_GPIO0_U, FUNC_GPIO0, NULL, NULL, 0, NULL, 0, 0, -1, false, 0}, 
+    {1, PERIPHS_IO_MUX_U0TXD_U, FUNC_GPIO1, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
+    {2, PERIPHS_IO_MUX_GPIO2_U, FUNC_GPIO2, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
+    {3, PERIPHS_IO_MUX_U0RXD_U, FUNC_GPIO3, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
+    {4, PERIPHS_IO_MUX_GPIO4_U, FUNC_GPIO4, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
+    {5, PERIPHS_IO_MUX_GPIO5_U, FUNC_GPIO5, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
 //    {9, PERIPHS_IO_MUX_SD_DATA2_U, FUNC_GPIO9, NULL, NULL},
 //    {10, PERIPHS_IO_MUX_SD_DATA3_U, FUNC_GPIO10, NULL, NULL},
-    {12, PERIPHS_IO_MUX_MTDI_U, FUNC_GPIO12, NULL, NULL, 0, NULL, 0, 0, -1},
-    {13, PERIPHS_IO_MUX_MTCK_U, FUNC_GPIO13, NULL, NULL, 0, NULL, 0, 0, -1},
-    {14, PERIPHS_IO_MUX_MTMS_U, FUNC_GPIO14, NULL, NULL, 0, NULL, 0, 0, -1},
-    {15, PERIPHS_IO_MUX_MTDO_U, FUNC_GPIO15, NULL, NULL, 0, NULL, 0, 0, -1}
+    {12, PERIPHS_IO_MUX_MTDI_U, FUNC_GPIO12, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
+    {13, PERIPHS_IO_MUX_MTCK_U, FUNC_GPIO13, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
+    {14, PERIPHS_IO_MUX_MTMS_U, FUNC_GPIO14, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
+    {15, PERIPHS_IO_MUX_MTDO_U, FUNC_GPIO15, NULL, NULL, 0, NULL, 0, 0, -1, false, 0}
 };
 
 #define NPINS (sizeof (pin_map) / sizeof (pmap_t))
@@ -111,7 +112,7 @@ STATIC void def_isr(void *arg)
                     pmi->ecount++;
                 }
                 pmi->start_time = now;
-                pmi->last_result = pmi->isr(pmi->data, now, signal);
+                pmi->last_result = pmi->isr(pmi, now, signal);
                 // gpio_intr_ack(bit);
                 GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, bit);
             } 
@@ -167,15 +168,95 @@ void ICACHE_FLASH_ATTR esp_gpio_isr_attach(pmap_t *pmp, isr_t vect, void *data, 
 }
 
 
+#define NEW 0
+#define HIGH 1
+
+STATIC int16_t gpio_handler(pmap_t *pmi, uint32_t now, uint8_t signal) {
+#if 0
+    int state = NEW;
+
+    static int timer_start = 0;
+
+    now = current_time()
+
+    pin_state = in(port)
+    if (state == NEW) {
+        timer_start = now;
+        add low to queue
+        state = low
+    } else if (state == low) {
+        if (state == high) 
+            if > 10ms elapsed
+                add high to queue
+                state = new
+        else
+            ignore
+    }
+
+
+
+
+    static int pushed = 0;
+    //esp_queue_obj_t *qq = (esp_queue_obj_t *)(args);
+    //uint8_t abc[1];
+    //abc[0] = pushed++;
+//    if (qq != mp_const_none) {
+//        esp_queue_dalist_8(qq, 1, abc);
+//    }
+    pushed++;
+    return pushed;
+#endif
+    return 0;
+}
+
+
+
+STATIC const mp_arg_t gpio_attach_args[] = {
+    {MP_QSTR_pin, MP_ARG_INT|MP_ARG_REQUIRED},
+    {MP_QSTR_queue, MP_ARG_OBJ|MP_ARG_REQUIRED},
+    {MP_QSTR_edge, MP_ARG_INT|MP_ARG_KW_ONLY, {.u_int = GPIO_PIN_INTR_ANYEDGE}},
+    {MP_QSTR_debounce, MP_ARG_INT|MP_ARG_KW_ONLY, {.u_int = 0}}
+};
+#define SMARTCONFIG_RUN_NUM_ARGS MP_ARRAY_SIZE(gpio_attach_args)
+
+STATIC ICACHE_FLASH_ATTR mp_obj_t gpio_attach(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    mp_arg_val_t vals[SMARTCONFIG_RUN_NUM_ARGS];
+    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(gpio_attach_args), gpio_attach_args, vals);
+
+    if (MP_OBJ_IS_TYPE(vals[1].u_obj, &esp_queue_type)) {
+        esp_queue_check_for_dalist_8((esp_queue_obj_t *)vals[1].u_obj, 2);
+    } else {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "queue needs to be an esp.os_queue type"));
+    }
+    printf("attach to pin %d edge %d queue %x (%x)\n",
+            vals[0].u_int, vals[2].u_int, (unsigned int)vals[1].u_obj, (unsigned int)mp_const_none);
+    pmap_t *pmp = pmap(vals[0].u_int);
+    pmp->debounce = vals[0].u_int;
+    esp_gpio_isr_attach(pmp, gpio_handler, vals[1].u_obj, 0);
+    gpio_pin_intr_state_set(GPIO_ID_PIN(pmp->pin), vals[2].u_int);
+    // GPIO_REG_WRITE(GPIO_ENABLE_W1TC_ADDRESS, (1 << pmp->pin));    // set to input
+    PIN_FUNC_SELECT(pmp->periph, pmp->func);
+    PIN_PULLUP_EN(pmp->periph);
+    GPIO_DIS_OUTPUT(pmp->pin);
+ //   pe(vals[0].u_int); //SC_TYPE_ESPTOUCH,SC_TYPE_AIRKISS,SC_TYPE_ESPTOUCH_AIRKISS
+//    wifi_set_opmode(STATION_MODE);
+//    smartconfig_start(smartconfig_callback);
+//void ICACHE_FLASH_ATTR esp_gpio_isr_attach(pmap_t *pmp, isr_t vect, void *data, uint16_t n_events)
+    return mp_const_none;
+}
+MP_DEFINE_CONST_FUN_OBJ_KW(gpio_attach_obj, 0, gpio_attach);
+
 STATIC const mp_map_elem_t mo_module_esp_gpio_globals_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_gpio)},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_attach), (mp_obj_t)&gpio_attach_obj },
+    {MP_OBJ_NEW_QSTR(MP_QSTR_print), (mp_obj_t)&esp_gpio_print_obj },
 
     {MP_OBJ_NEW_QSTR(MP_QSTR_INTR_DISABLE), MP_OBJ_NEW_SMALL_INT(GPIO_PIN_INTR_DISABLE)},
     {MP_OBJ_NEW_QSTR(MP_QSTR_INTR_POSEDGE), MP_OBJ_NEW_SMALL_INT(GPIO_PIN_INTR_POSEDGE)},
     {MP_OBJ_NEW_QSTR(MP_QSTR_INTR_NEGEDGE), MP_OBJ_NEW_SMALL_INT(GPIO_PIN_INTR_NEGEDGE)},
     {MP_OBJ_NEW_QSTR(MP_QSTR_INTR_ANYEDGE), MP_OBJ_NEW_SMALL_INT(GPIO_PIN_INTR_ANYEDGE)},
-    {MP_OBJ_NEW_QSTR(MP_QSTR_INTR_LOLEVEL), MP_OBJ_NEW_SMALL_INT(GPIO_PIN_INTR_LOLEVEL)},
-    {MP_OBJ_NEW_QSTR(MP_QSTR_INTR_HILEVEL), MP_OBJ_NEW_SMALL_INT(GPIO_PIN_INTR_HILEVEL)}
+//    {MP_OBJ_NEW_QSTR(MP_QSTR_INTR_LOLEVEL), MP_OBJ_NEW_SMALL_INT(GPIO_PIN_INTR_LOLEVEL)},
+//    {MP_OBJ_NEW_QSTR(MP_QSTR_INTR_HILEVEL), MP_OBJ_NEW_SMALL_INT(GPIO_PIN_INTR_HILEVEL)}
 
 };
 

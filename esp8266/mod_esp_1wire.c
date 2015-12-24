@@ -44,9 +44,10 @@
 #include "esp_1wire.h"
 #include "mod_esp_1wire.h"
 
-STATIC int esp_1wire_handler(void *args, uint32_t now, uint8_t signal)
+STATIC int16_t esp_1wire_handler(pmap_t *pmp, uint32_t now, uint8_t signal)
 {
-    esp_1wire_obj_t *self = (esp_1wire_obj_t *)(args);
+
+    esp_1wire_obj_t *self = (esp_1wire_obj_t *)(pmp->data);
     self->ints++;
     return 0;
 }
