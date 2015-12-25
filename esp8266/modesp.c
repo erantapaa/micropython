@@ -37,7 +37,6 @@
 #include "queue.h"
 #include "user_interface.h"
 #include "espconn.h"
-#include "ip_addr.h"
 #include "spi_flash.h"
 #include "utils.h"
 
@@ -656,7 +655,7 @@ STATIC mp_obj_t esp_flash_read(mp_obj_t offset_in, mp_obj_t len_in) {
     m_del(byte, buf, len);
     nlr_raise(mp_obj_new_exception_arg1(&mp_type_OSError, MP_OBJ_NEW_SMALL_INT(res == SPI_FLASH_RESULT_TIMEOUT ? ETIMEDOUT : EIO)));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(esp_flash_read_obj, esp_flash_read);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(esp_flash_read_obj, esp_flash_read);
 
 
 STATIC const mp_map_elem_t esp_module_globals_table[] = {
