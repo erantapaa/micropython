@@ -59,24 +59,29 @@ extern void *pvPortMalloc(size_t xWantedSize, const char *file, const char *line
 
 #define TIME system_get_time
 
+#if 0
 #define RAISE_ERRNO(err_flag, error_val) \
     { if (err_flag == -1) \
         { nlr_raise(mp_obj_new_exception_arg1(&mp_type_OSError, MP_OBJ_NEW_SMALL_INT(error_val))); } }
+#endif
 
+#define STATE_LOW 0
+#define STATE_HIGH 1
+#define STATE_NEW 3
 
 STATIC pmap_t pin_map[] = {
-    {0, PERIPHS_IO_MUX_GPIO0_U, FUNC_GPIO0, NULL, NULL, 0, NULL, 0, 0, -1, false, 0}, 
-    {1, PERIPHS_IO_MUX_U0TXD_U, FUNC_GPIO1, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
-    {2, PERIPHS_IO_MUX_GPIO2_U, FUNC_GPIO2, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
-    {3, PERIPHS_IO_MUX_U0RXD_U, FUNC_GPIO3, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
-    {4, PERIPHS_IO_MUX_GPIO4_U, FUNC_GPIO4, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
-    {5, PERIPHS_IO_MUX_GPIO5_U, FUNC_GPIO5, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
+    {0, PERIPHS_IO_MUX_GPIO0_U, FUNC_GPIO0, NULL, NULL, 0, NULL, 0, 0, -1, false, 0, STATE_NEW, mp_const_none}, 
+    {1, PERIPHS_IO_MUX_U0TXD_U, FUNC_GPIO1, NULL, NULL, 0, NULL, 0, 0, -1, false, 0, STATE_NEW, mp_const_none},
+    {2, PERIPHS_IO_MUX_GPIO2_U, FUNC_GPIO2, NULL, NULL, 0, NULL, 0, 0, -1, false, 0, STATE_NEW, mp_const_none},
+    {3, PERIPHS_IO_MUX_U0RXD_U, FUNC_GPIO3, NULL, NULL, 0, NULL, 0, 0, -1, false, 0, STATE_NEW, mp_const_none},
+    {4, PERIPHS_IO_MUX_GPIO4_U, FUNC_GPIO4, NULL, NULL, 0, NULL, 0, 0, -1, false, 0, STATE_NEW, mp_const_none},
+    {5, PERIPHS_IO_MUX_GPIO5_U, FUNC_GPIO5, NULL, NULL, 0, NULL, 0, 0, -1, false, 0, STATE_NEW, mp_const_none},
 //    {9, PERIPHS_IO_MUX_SD_DATA2_U, FUNC_GPIO9, NULL, NULL},
 //    {10, PERIPHS_IO_MUX_SD_DATA3_U, FUNC_GPIO10, NULL, NULL},
-    {12, PERIPHS_IO_MUX_MTDI_U, FUNC_GPIO12, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
-    {13, PERIPHS_IO_MUX_MTCK_U, FUNC_GPIO13, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
-    {14, PERIPHS_IO_MUX_MTMS_U, FUNC_GPIO14, NULL, NULL, 0, NULL, 0, 0, -1, false, 0},
-    {15, PERIPHS_IO_MUX_MTDO_U, FUNC_GPIO15, NULL, NULL, 0, NULL, 0, 0, -1, false, 0}
+    {12, PERIPHS_IO_MUX_MTDI_U, FUNC_GPIO12, NULL, NULL, 0, NULL, 0, 0, -1, false, 0, STATE_NEW, mp_const_none},
+    {13, PERIPHS_IO_MUX_MTCK_U, FUNC_GPIO13, NULL, NULL, 0, NULL, 0, 0, -1, false, 0, STATE_NEW, mp_const_none},
+    {14, PERIPHS_IO_MUX_MTMS_U, FUNC_GPIO14, NULL, NULL, 0, NULL, 0, 0, -1, false, 0, STATE_NEW, mp_const_none},
+    {15, PERIPHS_IO_MUX_MTDO_U, FUNC_GPIO15, NULL, NULL, 0, NULL, 0, 0, -1, false, 0, STATE_NEW, mp_const_none}
 };
 
 #define NPINS (sizeof (pin_map) / sizeof (pmap_t))
@@ -168,47 +173,25 @@ void ICACHE_FLASH_ATTR esp_gpio_isr_attach(pmap_t *pmp, isr_t vect, void *data, 
 }
 
 
-#define NEW 0
-#define HIGH 1
 
-STATIC int16_t gpio_handler(pmap_t *pmi, uint32_t now, uint8_t signal) {
-#if 0
-    int state = NEW;
+STATIC int16_t gpio_handler(pmap_t *pmp, uint32_t now, uint8_t signal) {
+    esp_queue_obj_t *queue = (esp_queue_obj_t *)pmp->data;
+    uint8_t pin_level = GPIO_INPUT_GET(pmp->pin);
 
-    static int timer_start = 0;
-
-    now = current_time()
-
-    pin_state = in(port)
-    if (state == NEW) {
-        timer_start = now;
-        add low to queue
-        state = low
-    } else if (state == low) {
-        if (state == high) 
-            if > 10ms elapsed
-                add high to queue
-                state = new
-        else
-            ignore
+    if (pmp->state == STATE_NEW) {
+        pmp->btimer_start = now;
+        esp_queue_daint_8(queue, 1);
+        pmp->state = STATE_LOW;
+    } else if (pmp->state == STATE_LOW) {
+        if ((now - pmp->btimer_start) > pmp->debounce) {
+            if (pin_level == 1) {
+                esp_queue_daint_8(queue, 0);
+                pmp->state = STATE_NEW;
+            } 
+        }
     }
-
-
-
-
-    static int pushed = 0;
-    //esp_queue_obj_t *qq = (esp_queue_obj_t *)(args);
-    //uint8_t abc[1];
-    //abc[0] = pushed++;
-//    if (qq != mp_const_none) {
-//        esp_queue_dalist_8(qq, 1, abc);
-//    }
-    pushed++;
-    return pushed;
-#endif
     return 0;
 }
-
 
 
 STATIC const mp_arg_t gpio_attach_args[] = {
@@ -223,25 +206,23 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t gpio_attach(mp_uint_t n_args, const mp_obj_t *
     mp_arg_val_t vals[SMARTCONFIG_RUN_NUM_ARGS];
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(gpio_attach_args), gpio_attach_args, vals);
 
+    pmap_t *pmp = pmap(vals[0].u_int);
+    if (pmp == NULL) {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_ValueError, "invalid pin %d", vals[0].u_int));
+    }
+
     if (MP_OBJ_IS_TYPE(vals[1].u_obj, &esp_queue_type)) {
-        esp_queue_check_for_dalist_8((esp_queue_obj_t *)vals[1].u_obj, 2);
+        esp_queue_check_for_daint_8((esp_queue_obj_t *)vals[1].u_obj);
+        pmp->queue = vals[1].u_obj;
     } else {
         nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "queue needs to be an esp.os_queue type"));
     }
-    printf("attach to pin %d edge %d queue %x (%x)\n",
-            vals[0].u_int, vals[2].u_int, (unsigned int)vals[1].u_obj, (unsigned int)mp_const_none);
-    pmap_t *pmp = pmap(vals[0].u_int);
-    pmp->debounce = vals[0].u_int;
+    pmp->debounce = vals[3].u_int;
     esp_gpio_isr_attach(pmp, gpio_handler, vals[1].u_obj, 0);
     gpio_pin_intr_state_set(GPIO_ID_PIN(pmp->pin), vals[2].u_int);
-    // GPIO_REG_WRITE(GPIO_ENABLE_W1TC_ADDRESS, (1 << pmp->pin));    // set to input
     PIN_FUNC_SELECT(pmp->periph, pmp->func);
     PIN_PULLUP_EN(pmp->periph);
     GPIO_DIS_OUTPUT(pmp->pin);
- //   pe(vals[0].u_int); //SC_TYPE_ESPTOUCH,SC_TYPE_AIRKISS,SC_TYPE_ESPTOUCH_AIRKISS
-//    wifi_set_opmode(STATION_MODE);
-//    smartconfig_start(smartconfig_callback);
-//void ICACHE_FLASH_ATTR esp_gpio_isr_attach(pmap_t *pmp, isr_t vect, void *data, uint16_t n_events)
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(gpio_attach_obj, 0, gpio_attach);

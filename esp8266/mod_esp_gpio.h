@@ -49,6 +49,8 @@ typedef struct pmap_s {
 
     uint16_t debounce;
     uint32_t btimer_start;
+    int state;
+    mp_obj_t queue;
 } pmap_t;
 
 typedef int16_t (*isr_t)(pmap_t *pmp, uint32_t now, uint8_t signal);

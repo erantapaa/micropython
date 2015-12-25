@@ -141,6 +141,14 @@ bool ICACHE_FLASH_ATTR esp_queue_check_for_dalist_8(esp_queue_obj_t *queue_in, u
     return true;
 }
 
+bool ICACHE_FLASH_ATTR esp_queue_check_for_daint_8(esp_queue_obj_t *queue_in) {
+    mp_obj_t *inst = queue_in->obj_instances[queue_in->last];
+    if (!MP_OBJ_IS_SMALL_INT(inst)) {
+        nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "not smallint"));
+    } 
+    return true;
+}
+
 // for use in interrupts no ICACHE_FLASH_ATTR!
 int8_t esp_queue_dalist_8(esp_queue_obj_t *queue_in, uint32_t len, uint8_t *vals) {
 	if (queue_in->items >= queue_in->max_items) {
