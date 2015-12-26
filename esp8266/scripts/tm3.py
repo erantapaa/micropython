@@ -1,4 +1,32 @@
 import esp
+import pyb
+
+
+class ButtonHandler:
+    START = 0
+    COLLECT = 1
+
+    def __init__(self, period=3000):
+        self.state = self.START
+        self.start_time = 0
+        self.period = period
+
+    def timer_finish(self):
+        print("Events")
+        for ii in self.events:
+            print(ii)
+        self.state = self.START
+
+    def handle(self, button_value):
+        if self.state == self.START:
+            self.start_time = pyb.millis()
+            self.state = self.COLLECT
+            self.events = list()
+            self.timer = esp.os_timer(lambda timer: self.timer_finish(), period=self.period, repeat=False)
+            elapsed = 0
+        else:
+            elapsed = pyb.elapsed_millis(self.start_time)
+        self.events.append((button_value, elapsed))
 
 
 class TManager:
@@ -9,11 +37,15 @@ class TManager:
                     yy = vv.get()
                 except Empty:
                     break
-                print("kk %s val %s" % (kk, str(yy)))
+                if kk == 'button':
+                    self.bhandler.handle(yy)
+                else:
+                    print("kk %s val %s" % (kk, str(yy)))
 
     def __init__(self):
         self.os_task = esp.os_task(callback=lambda tm: self.handler(tm))
         self.dqueues = dict()
+        self.bhandler = ButtonHandler()
 
     def add_q(self, name, qq):
         if name not in self.dqueues:
