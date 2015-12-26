@@ -98,6 +98,7 @@ LIB_SRC_C = $(addprefix lib/,\
 	timeutils/timeutils.c \
 	utils/pyexec.c \
 	utils/printf.c \
+	utils/pyexec.c \
 	)
 
 SRC_S = \

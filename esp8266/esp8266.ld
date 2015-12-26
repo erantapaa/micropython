@@ -81,6 +81,8 @@ SECTIONS
 
         /* we put some specific text in this section */
         *py/*.o*(.literal* .text*)
+        *lib/*.o*(.literal* .text*)
+        *extmod/*.o*(.literal* .text*)
         *pyexec.o(.literal*, .text*)
         *readline.o(.literal*, .text*)
         *pybstdio.o(.literal*, .text*)

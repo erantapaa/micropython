@@ -656,4 +656,14 @@ Q(status)
 #if MICROPY_MODULE_ESP_QUEUE
 Q(Empty)
 Q(Full)
+
+#if MICROPY_FSUSERMOUNT
+// for user-mountable block devices
+Q(mount)
+Q(readonly)
+Q(mkfs)
+Q(readblocks)
+Q(writeblocks)
+Q(sync)
+Q(count)
 #endif
