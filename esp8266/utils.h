@@ -25,5 +25,6 @@
  * THE SOFTWARE.
  */
 
+mp_obj_t call_function_0_protected(mp_obj_t fun);
 mp_obj_t call_function_1_protected(mp_obj_t fun, mp_obj_t arg);
 mp_obj_t call_function_2_protected(mp_obj_t fun, mp_obj_t arg1, mp_obj_t arg2);

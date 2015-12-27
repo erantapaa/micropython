@@ -36,21 +36,41 @@
 #include "osapi.h"
 #include "os_type.h"
 #include "utils.h"
+#include "netutils.h"
 #include "user_interface.h"
 #include "smartconfig.h"
 
+
+typedef struct _esp_easyconfig_obj_t {
+    mp_obj_t wait_cb;
+    mp_obj_t find_channel_cb;
+    mp_obj_t getting_ssid_pswd_cb;
+    mp_obj_t link_cb;
+    mp_obj_t link_over_cb;
+} esp_easyconfig_obj_t;
+
+static esp_easyconfig_obj_t cb;
 
 void STATIC ICACHE_FLASH_ATTR smartconfig_callback(sc_status status, void *pdata) {
     switch(status) {
         case SC_STATUS_WAIT:
             printf("SC_STATUS_WAIT\n");
+            if (cb.wait_cb != mp_const_none) {
+                call_function_0_protected(cb.wait_cb);
+            }
             break;
         case SC_STATUS_FIND_CHANNEL:
             printf("SC_STATUS_FIND_CHANNEL\n");
+            if (cb.find_channel_cb != mp_const_none) {
+                call_function_0_protected(cb.find_channel_cb);
+            }
             break;
         case SC_STATUS_GETTING_SSID_PSWD:
             printf("SC_STATUS_GETTING_SSID_PSWD\n");
 			sc_type *type = pdata;
+            if (cb.getting_ssid_pswd_cb != mp_const_none) {
+                call_function_1_protected(cb.getting_ssid_pswd_cb, mp_obj_new_int(*type));
+            }
             if (*type == SC_TYPE_ESPTOUCH) {
                 printf("SC_TYPE:SC_TYPE_ESPTOUCH\n");
             } else {
@@ -72,7 +92,12 @@ void STATIC ICACHE_FLASH_ATTR smartconfig_callback(sc_status status, void *pdata
             break;
         case SC_STATUS_LINK_OVER:
             printf("SC_STATUS_LINK_OVER\n");
+            if (cb.link_over_cb != mp_const_none) {
+                call_function_1_protected(cb.link_over_cb,
+                                          pdata != NULL ? netutils_format_ipv4_addr((uint8 *)pdata, NETUTILS_LITTLE) : mp_const_none);
+            }
             if (pdata != NULL) {
+
                 uint8 phone_ip[4] = {0};
 
                 memcpy(phone_ip, (uint8*)pdata, 4);
@@ -85,7 +110,12 @@ void STATIC ICACHE_FLASH_ATTR smartconfig_callback(sc_status status, void *pdata
 }
 
 STATIC const mp_arg_t smartconfig_run_args[] = {
-    {MP_QSTR_mode, MP_ARG_INT|MP_ARG_KW_ONLY, {.u_int = SC_TYPE_ESPTOUCH}}
+    {MP_QSTR_mode, MP_ARG_INT|MP_ARG_KW_ONLY, {.u_int = SC_TYPE_ESPTOUCH}},
+    {MP_QSTR_wait, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},
+    {MP_QSTR_find_channel, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},
+    {MP_QSTR_getting_ssid_pswd, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},
+    {MP_QSTR_link, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},
+    {MP_QSTR_link_over, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}}
 };
 #define SMARTCONFIG_RUN_NUM_ARGS MP_ARRAY_SIZE(smartconfig_run_args)
 
@@ -95,6 +125,13 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t smartconfig_run(mp_uint_t n_args, const mp_obj
 
     smartconfig_set_type(vals[0].u_int); //SC_TYPE_ESPTOUCH,SC_TYPE_AIRKISS,SC_TYPE_ESPTOUCH_AIRKISS
     wifi_set_opmode(STATION_MODE);
+
+    cb.wait_cb = vals[1].u_obj;
+    cb.find_channel_cb = vals[2].u_obj;
+    cb.getting_ssid_pswd_cb = vals[3].u_obj;
+    cb.link_cb = vals[4].u_obj;
+    cb.link_over_cb = vals[5].u_obj;
+
     smartconfig_start(smartconfig_callback);
     return mp_const_none;
 }
