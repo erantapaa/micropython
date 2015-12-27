@@ -6,18 +6,26 @@ class ButtonHandler:
     START = 0
     COLLECT = 1
 
-    def __init__(self, period=3000):
+    def __init__(self, period=2000):
         self.state = self.START
         self.start_time = 0
         self.period = period
+        esp.gpio.p16_init()
+        esp.gpio.p16_write(1)
 
     def timer_finish(self):
         print("Events")
         for ii in self.events:
             print(ii)
+        print("0s", len([ii for ii in self.events if ii[0] == 0]))
         self.state = self.START
 
     def handle(self, button_value):
+        if button_value == 0:
+            esp.gpio.p16_write(0)
+        else:
+            esp.gpio.p16_write(1)
+
         if self.state == self.START:
             self.start_time = pyb.millis()
             self.state = self.COLLECT
@@ -60,5 +68,5 @@ aa = esp.dht(4, queue=q)
 
 storage = [0 for kk in range(4)]
 bq = esp.queue(storage, os_task=tm.os_task)
-esp.gpio.attach(0, queue=bq, debounce=50)
+esp.gpio.attach(0, queue=bq, debounce=20)
 tm.add_q('button', bq)

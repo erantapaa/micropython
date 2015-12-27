@@ -180,12 +180,13 @@ STATIC int16_t gpio_handler(pmap_t *pmp, uint32_t now, uint8_t signal) {
 
     if (pmp->state == STATE_NEW) {
         pmp->btimer_start = now;
-        esp_queue_daint_8(queue, 1);
+        esp_queue_daint_8(queue, pin_level);
         pmp->state = STATE_LOW;
     } else if (pmp->state == STATE_LOW) {
-        if ((now - pmp->btimer_start) > pmp->debounce) {
-            if (pin_level == 1) {
-                esp_queue_daint_8(queue, 0);
+        uint32_t elapsed = (now - pmp->btimer_start) & 0x3fffffff;
+        if (elapsed > pmp->debounce) {
+            if (pin_level) {
+                esp_queue_daint_8(queue, pin_level);
                 pmp->state = STATE_NEW;
             } 
         }
@@ -227,10 +228,29 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t gpio_attach(mp_uint_t n_args, const mp_obj_t *
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(gpio_attach_obj, 0, gpio_attach);
 
+STATIC mp_obj_t ICACHE_FLASH_ATTR esp_gpio16_init(void) {
+    WRITE_PERI_REG(PAD_XPD_DCDC_CONF, (READ_PERI_REG(PAD_XPD_DCDC_CONF) & 0xffffffbc) | (uint32)0x1);
+    WRITE_PERI_REG(RTC_GPIO_CONF, (READ_PERI_REG(RTC_GPIO_CONF) & (uint32)0xfffffffe) | (uint32)0x0);
+    WRITE_PERI_REG(RTC_GPIO_ENABLE, (READ_PERI_REG(RTC_GPIO_ENABLE) & (uint32)0xfffffffe) | (uint32)0x1);
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_gpio16_init_obj, esp_gpio16_init);
+
+STATIC mp_obj_t ICACHE_FLASH_ATTR esp_gpio16_write(mp_obj_t in_val)
+{
+    uint32_t value = mp_obj_get_int(in_val);
+
+    WRITE_PERI_REG(RTC_GPIO_OUT, (READ_PERI_REG(RTC_GPIO_OUT) & (uint32)0xfffffffe) | (uint32)(value & 1));
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_gpio16_write_obj, esp_gpio16_write);
+
 STATIC const mp_map_elem_t mo_module_esp_gpio_globals_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_gpio)},
     {MP_OBJ_NEW_QSTR(MP_QSTR_attach), (mp_obj_t)&gpio_attach_obj },
     {MP_OBJ_NEW_QSTR(MP_QSTR_print), (mp_obj_t)&esp_gpio_print_obj },
+    {MP_OBJ_NEW_QSTR(MP_QSTR_p16_init), (mp_obj_t)&esp_gpio16_init_obj },
+    {MP_OBJ_NEW_QSTR(MP_QSTR_p16_write), (mp_obj_t)&esp_gpio16_write_obj },
 
     {MP_OBJ_NEW_QSTR(MP_QSTR_INTR_DISABLE), MP_OBJ_NEW_SMALL_INT(GPIO_PIN_INTR_DISABLE)},
     {MP_OBJ_NEW_QSTR(MP_QSTR_INTR_POSEDGE), MP_OBJ_NEW_SMALL_INT(GPIO_PIN_INTR_POSEDGE)},

@@ -178,6 +178,8 @@ Q(INTR_NEGEDGE)
 Q(INTR_ANYEDGE)
 Q(INTR_LOLEVEL)
 Q(INTR_HILEVEL)
+Q(p16_init)
+Q(p16_write)
 
 // mod_esp_dht
 Q(dht)
