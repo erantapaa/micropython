@@ -50,6 +50,7 @@
 #include "mod_esp_1wire.h"
 #include "mod_esp_queue.h"
 #include "mod_esp_smartconfig.h"
+#include "mod_esp_wifi_events.h"
 
 STATIC const mp_obj_type_t esp_socket_type;
 
@@ -681,6 +682,7 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_one_wire), (mp_obj_t)&esp_1wire_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_queue), (mp_obj_t)&esp_queue_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_smartconfig), (mp_obj_t)&mp_module_esp_smartconfig},
+    { MP_OBJ_NEW_QSTR(MP_QSTR_wifi_events), (mp_obj_t)&mp_module_esp_wifi_events},
 
 #if MODESP_INCLUDE_CONSTANTS
     { MP_OBJ_NEW_QSTR(MP_QSTR_MODE_11B),
