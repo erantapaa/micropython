@@ -54,59 +54,50 @@ static esp_easyconfig_obj_t cb;
 void STATIC ICACHE_FLASH_ATTR smartconfig_callback(sc_status status, void *pdata) {
     switch(status) {
         case SC_STATUS_WAIT:
-            printf("SC_STATUS_WAIT\n");
             if (cb.wait_cb != mp_const_none) {
                 call_function_0_protected(cb.wait_cb);
             }
             break;
         case SC_STATUS_FIND_CHANNEL:
-            printf("SC_STATUS_FIND_CHANNEL\n");
             if (cb.find_channel_cb != mp_const_none) {
                 call_function_0_protected(cb.find_channel_cb);
             }
             break;
         case SC_STATUS_GETTING_SSID_PSWD:
-            printf("SC_STATUS_GETTING_SSID_PSWD\n");
-			sc_type *type = pdata;
             if (cb.getting_ssid_pswd_cb != mp_const_none) {
-                call_function_1_protected(cb.getting_ssid_pswd_cb, mp_obj_new_int(*type));
-            }
-            if (*type == SC_TYPE_ESPTOUCH) {
-                printf("SC_TYPE:SC_TYPE_ESPTOUCH\n");
-            } else {
-                printf("SC_TYPE:SC_TYPE_AIRKISS\n");
+                call_function_1_protected(cb.getting_ssid_pswd_cb, mp_obj_new_int(*(sc_type *)pdata));
             }
             break;
         case SC_STATUS_LINK:
-            printf("SC_STATUS_LINK\n");
-            struct station_config *sta_conf = pdata;
+            if (cb.getting_ssid_pswd_cb != mp_const_none) {
+                struct station_config *sta_conf = pdata;
 
-            printf("name: \"%s\"\n", sta_conf->ssid);
-            printf("pass: \"%s\"\n", sta_conf->password);
-            printf("bssid_set: %u\n", sta_conf->bssid_set);
-            printf("bssid: \"%s\"\n", sta_conf->bssid);
+                mp_obj_t ssid = mp_obj_new_str((const char *)sta_conf->ssid, strlen((const char *)sta_conf->ssid), true);
+                mp_obj_t password = mp_obj_new_str((const char *)sta_conf->password, strlen((const char *)sta_conf->password), true);
+                // use this is saving the BSSID
+                // printf("bssid_set: %u\n", sta_conf->bssid_set);
+                // printf("bssid: \"%s\"\n", sta_conf->bssid);
+                //  uint8 bssid_set;    // Note: If bssid_set is 1, station will just connect to the router
+                //                            // with both ssid[] and bssid[] matched. Please check about this.
+                //  uint8 bssid[6];
+                //
+                //mp_obj_tuple_t *tuple = mp_obj_new_tuple(6, NULL);
+                // for ii in size
+                // tuple->items[ii] = MP_OBJ_NEW_SMALL_INT(bssid);
+                
+                call_function_2_protected(cb.link_cb, ssid, password);
+            }
 
-	        wifi_station_set_config(sta_conf);
-	        wifi_station_disconnect();
-	        wifi_station_connect();
+            // wifi_station_set_config(sta_conf);
+	        //wifi_station_disconnect();
+	        // wifi_station_connect();
             break;
         case SC_STATUS_LINK_OVER:
-            printf("SC_STATUS_LINK_OVER\n");
             if (cb.link_over_cb != mp_const_none) {
-                call_function_1_protected(cb.link_over_cb,
-                                          pdata != NULL ? netutils_format_ipv4_addr((uint8 *)pdata, NETUTILS_LITTLE) : mp_const_none);
+                call_function_1_protected(cb.link_over_cb, pdata != NULL ? netutils_format_ipv4_addr((uint8 *)pdata, NETUTILS_LITTLE) : mp_const_none);
             }
-            if (pdata != NULL) {
-
-                uint8 phone_ip[4] = {0};
-
-                memcpy(phone_ip, (uint8*)pdata, 4);
-                printf("Phone ip: %d.%d.%d.%d\n",phone_ip[0],phone_ip[1],phone_ip[2],phone_ip[3]);
-            }
-            smartconfig_stop();
             break;
     }
-	
 }
 
 STATIC const mp_arg_t smartconfig_run_args[] = {
@@ -119,7 +110,7 @@ STATIC const mp_arg_t smartconfig_run_args[] = {
 };
 #define SMARTCONFIG_RUN_NUM_ARGS MP_ARRAY_SIZE(smartconfig_run_args)
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t smartconfig_run(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t esp_smartconfig_run(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     mp_arg_val_t vals[SMARTCONFIG_RUN_NUM_ARGS];
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(smartconfig_run_args), smartconfig_run_args, vals);
 
@@ -135,11 +126,18 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t smartconfig_run(mp_uint_t n_args, const mp_obj
     smartconfig_start(smartconfig_callback);
     return mp_const_none;
 }
-MP_DEFINE_CONST_FUN_OBJ_KW(smartconfig_run_obj, 0, smartconfig_run);
+MP_DEFINE_CONST_FUN_OBJ_KW(esp_smartconfig_run_obj, 0, esp_smartconfig_run);
+
+STATIC mp_obj_t esp_smartconfig_stop(void) {
+    smartconfig_stop();
+    return mp_const_none;
+}
+MP_DEFINE_CONST_FUN_OBJ_0(esp_smartconfig_stop_obj, esp_smartconfig_stop);
 
 STATIC const mp_map_elem_t mo_module_esp_smartconfig_globals_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_smartconfig)},
-    { MP_OBJ_NEW_QSTR(MP_QSTR_run), (mp_obj_t)&smartconfig_run_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_run), (mp_obj_t)&esp_smartconfig_run_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_stop), (mp_obj_t)&esp_smartconfig_stop_obj }
 };
 
 STATIC MP_DEFINE_CONST_DICT(mo_module_esp_smartconfig_globals, mo_module_esp_smartconfig_globals_table);
