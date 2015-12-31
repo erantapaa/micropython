@@ -243,3 +243,10 @@ Q(getting_ssid_pswd)
 Q(link)
 Q(link_over)
 Q(stop)
+
+// wifi_events
+Q(wifi_events)
+Q(stamode_connected)
+Q(stamode_disconnected)
+Q(stamode_authmode_change)
+Q(stamode_got_ip)
