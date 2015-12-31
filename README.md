@@ -2,17 +2,22 @@ Rob's ESP extended port
 =======================
 Changes over upstream
 --------------------
+* wifi events manager `(esp.wifi_events.init)`
+* esp smart config (esp.smartconfig)
+* Queuing between interrupt io and python user space.
+* Attachment of GPIO interrupts to buttons and user task scheduling 
+  You can have a python function called when an interrupt driven button is pressed.
+* Software debouncing of switches for interrupt queued tasks
 * Interrupt drivern GPIO
 * Full interrupt driven DHT22 temperature and humidity sensor.
 * ESP SDK os task scheduling.
-* Dallas 1 Wire protocol. (Soon to have interrupt driven notiifcation, such as conversion).
+* Dallas 1 Wire protocol. (Soon to have interrupt driven notiifcation, such as conversion but not support by my DS hardware).
 * I2C on any lines.
 * Frozen code is all in the word addressable SPI rom. Byte level unpacking is supported.
 * Mutexes using assembly language and a python wrapper.
 * ESP OS timers.
 * Updates tcp/ip (now stress tested over 100s of hours and 100% stable so far).
 
-* Work in progress queuing between interrupt io and python user space.
 
 Notes
 -----
