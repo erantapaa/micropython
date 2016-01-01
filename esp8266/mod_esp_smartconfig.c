@@ -100,7 +100,7 @@ void STATIC ICACHE_FLASH_ATTR smartconfig_callback(sc_status status, void *pdata
     }
 }
 
-STATIC const mp_arg_t smartconfig_run_args[] = {
+STATIC const mp_arg_t smartconfig_init_args[] = {
     {MP_QSTR_mode, MP_ARG_INT|MP_ARG_KW_ONLY, {.u_int = SC_TYPE_ESPTOUCH}},
     {MP_QSTR_wait, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},
     {MP_QSTR_find_channel, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},
@@ -108,27 +108,31 @@ STATIC const mp_arg_t smartconfig_run_args[] = {
     {MP_QSTR_link, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},
     {MP_QSTR_link_over, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}}
 };
-#define SMARTCONFIG_RUN_NUM_ARGS MP_ARRAY_SIZE(smartconfig_run_args)
+#define SMARTCONFIG_INIT_NUM_ARGS MP_ARRAY_SIZE(smartconfig_init_args)
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t esp_smartconfig_run(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    mp_arg_val_t vals[SMARTCONFIG_RUN_NUM_ARGS];
-    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(smartconfig_run_args), smartconfig_run_args, vals);
+STATIC ICACHE_FLASH_ATTR mp_obj_t esp_smartconfig_init(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    mp_arg_val_t vals[SMARTCONFIG_INIT_NUM_ARGS];
+    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(smartconfig_init_args), smartconfig_init_args, vals);
 
     smartconfig_set_type(vals[0].u_int); //SC_TYPE_ESPTOUCH,SC_TYPE_AIRKISS,SC_TYPE_ESPTOUCH_AIRKISS
-    wifi_set_opmode(STATION_MODE);
 
     cb.wait_cb = vals[1].u_obj;
     cb.find_channel_cb = vals[2].u_obj;
     cb.getting_ssid_pswd_cb = vals[3].u_obj;
     cb.link_cb = vals[4].u_obj;
     cb.link_over_cb = vals[5].u_obj;
+    return mp_const_none;
+}
+MP_DEFINE_CONST_FUN_OBJ_KW(esp_smartconfig_init_obj, 0, esp_smartconfig_init);
 
+STATIC ICACHE_FLASH_ATTR mp_obj_t esp_smartconfig_start(void) {
+    wifi_set_opmode(STATION_MODE);
     smartconfig_start(smartconfig_callback);
     return mp_const_none;
 }
-MP_DEFINE_CONST_FUN_OBJ_KW(esp_smartconfig_run_obj, 0, esp_smartconfig_run);
+MP_DEFINE_CONST_FUN_OBJ_0(esp_smartconfig_start_obj, esp_smartconfig_start);
 
-STATIC mp_obj_t esp_smartconfig_stop(void) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t esp_smartconfig_stop(void) {
     smartconfig_stop();
     return mp_const_none;
 }
@@ -136,7 +140,8 @@ MP_DEFINE_CONST_FUN_OBJ_0(esp_smartconfig_stop_obj, esp_smartconfig_stop);
 
 STATIC const mp_map_elem_t mo_module_esp_smartconfig_globals_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_smartconfig)},
-    { MP_OBJ_NEW_QSTR(MP_QSTR_run), (mp_obj_t)&esp_smartconfig_run_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_init), (mp_obj_t)&esp_smartconfig_init_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_start), (mp_obj_t)&esp_smartconfig_start_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_stop), (mp_obj_t)&esp_smartconfig_stop_obj }
 };
 
