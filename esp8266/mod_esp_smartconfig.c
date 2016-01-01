@@ -138,11 +138,13 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_smartconfig_stop(void) {
 }
 MP_DEFINE_CONST_FUN_OBJ_0(esp_smartconfig_stop_obj, esp_smartconfig_stop);
 
+
 STATIC const mp_map_elem_t mo_module_esp_smartconfig_globals_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_smartconfig)},
     { MP_OBJ_NEW_QSTR(MP_QSTR_init), (mp_obj_t)&esp_smartconfig_init_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_start), (mp_obj_t)&esp_smartconfig_start_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_stop), (mp_obj_t)&esp_smartconfig_stop_obj }
+    { MP_OBJ_NEW_QSTR(MP_QSTR_stop), (mp_obj_t)&esp_smartconfig_stop_obj },
+
 };
 
 STATIC MP_DEFINE_CONST_DICT(mo_module_esp_smartconfig_globals, mo_module_esp_smartconfig_globals_table);

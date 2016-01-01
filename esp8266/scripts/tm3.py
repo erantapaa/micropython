@@ -1,5 +1,49 @@
 import esp
 import pyb
+import network
+
+# button
+# smartconfig
+# server
+# gpio
+# json
+#  (switch on 0, relay on 12 and green led on 13)
+
+
+class SM:
+    def wait(self):
+        print("wait")
+
+    def find_channel(self):
+        print("find channel")
+
+    def getting_ssid_pswd(self, dtype):
+        print("getting ssid type", dtype)
+
+    def link(self, ssid, password):
+        print("Link", ssid, password)
+        self.indicator.blink(period=500)
+        network.disconnect()
+        network.connect(ssid, password)
+
+    def link_over(self, phone_ip):
+        print("over done", phone_ip)
+        self.indicator.mode(Indicator.OFF)
+        esp.smartconfig.stop()
+
+    def start(self):
+        esp.smartconfig.start()
+
+    def stop(self):
+        esp.smartconfig.stop()
+
+    def __init__(self, indicator):
+        esp.smartconfig.init(wait=lambda: self.wait,
+                             find_channel=lambda: self.find_channel(),
+                             getting_ssid_pswd=lambda dtype: self.getting_ssid_pswd(dtype),
+                             link=lambda ssid, password: self.link(ssid, password),
+                             link_over=lambda phone_ip: self.link_over(phone_ip))
+        self.indicator = indicator
 
 
 class Indicator:
@@ -20,6 +64,9 @@ class Indicator:
             self.state = self.ON
 
     def blink(self, period=100):
+        if self.timer:
+            self.timer.cancel
+            self.timer = None
         self.timer = esp.os_timer(lambda timer: self.timer_target(), period=period)
 
     def mode(self, state):
@@ -44,6 +91,8 @@ class ButtonHandler:
         self.period = period
         self.click_state = self.STATE_CLICK_START
         self.indicator = Indicator()
+        self.smartconfig = SM(self.indicator)
+        self.smart_running = False
 
     def timer_finish(self):
 #        print("Events")
@@ -53,11 +102,15 @@ class ButtonHandler:
         zero_count = len([ii for ii in self.events if ii[0] == 0])
         if self.click_state == self.STATE_CLICK_START:
             if zero_count == 2:
-                self.indicator.blink(period=500)
+                print("easyconfig")
+                if self.smart_running:
+                    self.smartconfig.stop()
+                self.indicator.blink(period=200)
                 self.click_state = self.STATE_CLICK_CONFIRM_CONFIG
         elif self.click_state == self.STATE_CLICK_CONFIRM_CONFIG:
             if zero_count == 2:
-                print("go into easyconfig")
+                self.smart_running = True
+                self.smartconfig.start()
                 self.click_state = self.STATE_CLICK_IN_CONFIG
                 self.indicator.blink()
             else:
@@ -110,10 +163,6 @@ class TManager:
 
 
 tm = TManager()
-storage = [[0 for ii in range(esp.dht.DATA_SIZE)] for kk in range(4)]
-q = esp.queue(storage, os_task=tm.os_task)
-tm.add_q('temp', q)
-aa = esp.dht(4, queue=q)
 
 storage = [0 for kk in range(4)]
 bq = esp.queue(storage, os_task=tm.os_task)
