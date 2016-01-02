@@ -94,7 +94,8 @@ void STATIC ICACHE_FLASH_ATTR smartconfig_callback(sc_status status, void *pdata
             break;
         case SC_STATUS_LINK_OVER:
             if (cb.link_over_cb != mp_const_none) {
-                call_function_1_protected(cb.link_over_cb, pdata != NULL ? netutils_format_ipv4_addr((uint8 *)pdata, NETUTILS_LITTLE) : mp_const_none);
+                call_function_1_protected(cb.link_over_cb, pdata != NULL ?
+                                          netutils_format_ipv4_addr((uint8 *)pdata, NETUTILS_BIG) : mp_const_none);
             }
             break;
     }

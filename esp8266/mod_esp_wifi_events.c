@@ -51,15 +51,11 @@ typedef struct _esp_wifi_events_obj_t {
 static  esp_wifi_events_obj_t cb;
 
 
+#if 0
 mp_obj_t STATIC ICACHE_FLASH_ATTR esp_ip_addr_to_str(ip_addr_t *ipaddr) {
-    uint8_t ip[4];
-
-    ip[0] = (ipaddr->addr >>  0) & 0xff;
-    ip[1] = (ipaddr->addr >>  8) & 0xff;
-    ip[2] = (ipaddr->addr >> 16) & 0xff;
-    ip[3] = (ipaddr->addr >> 24) & 0xff;
-    return netutils_format_ipv4_addr(ip, NETUTILS_BIG);
+    return netutils_format_ipv4_addr((uint8_t *)&ipaddr->addr, NETUTILS_BIG);
 }
+#endif
 
 void STATIC ICACHE_FLASH_ATTR wifi_handle_event_cb(System_Event_t *evt) {
 
@@ -91,9 +87,9 @@ void STATIC ICACHE_FLASH_ATTR wifi_handle_event_cb(System_Event_t *evt) {
     case EVENT_STAMODE_GOT_IP:
         if (cb.stamode_got_ip_cb != mp_const_none) {
             mp_obj_t args[3];
-            args[0] = esp_ip_addr_to_str(&evt->event_info.got_ip.ip);
-            args[1] = esp_ip_addr_to_str(&evt->event_info.got_ip.mask);
-            args[2] = esp_ip_addr_to_str(&evt->event_info.got_ip.gw);
+            args[0] = netutils_format_ipv4_addr((uint8_t *)&evt->event_info.got_ip.ip.addr, NETUTILS_BIG);
+            args[1] = netutils_format_ipv4_addr((uint8_t *)&evt->event_info.got_ip.mask, NETUTILS_BIG);
+            args[2] = netutils_format_ipv4_addr((uint8_t *)&evt->event_info.got_ip.gw, NETUTILS_BIG);
             nlr_buf_t nlr;
             if (nlr_push(&nlr) == 0) {
                 mp_call_function_n_kw(cb.stamode_got_ip_cb, 3, 0, args);

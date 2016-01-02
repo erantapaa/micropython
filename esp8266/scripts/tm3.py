@@ -2,6 +2,7 @@ import esp
 import pyb
 import network
 from indicator import Indicator
+from wifi_events import WifiEventManager
 
 # button
 # smartconfig
@@ -71,30 +72,25 @@ class ButtonHandler:
         self.iostate = False
 
     def timer_finish(self):
-        print("Events")
-        for ii in self.events:
-            print(ii)
+        #print("Events")
+        #for ii in self.events:
+        #    print(ii)
 
         zero_count = len([ii for ii in self.events if ii[0] == 0])
         if self.click_state == self.STATE_CLICK_START:
             if zero_count == 2:
-                print("maybe easyconfig, cancel exiting easyconfig")
                 if self.smartconfig.running:
-                    print("already running so cancel")
                     self.smartconfig.stop()
                 self.indicator.blink(period=100)
                 self.click_state = self.STATE_CLICK_CONFIRM_CONFIG
         elif self.click_state == self.STATE_CLICK_CONFIRM_CONFIG:
             if zero_count == 2:
-                print("double click confirmed easyconfig")
                 self.smartconfig.start(self.iostate)
                 self.click_state = self.STATE_CLICK_IN_CONFIG
                 self.indicator.blink(period=500)
             else:
-                print("no easyconfig")
                 self.click_state = self.STATE_CLICK_START
         elif self.click_state == self.STATE_CLICK_IN_CONFIG:
-            print("cancel double click mode")
             self.click_state = self.STATE_CLICK_START
 
         self.state = self.STATE_BUTTON_START
@@ -132,6 +128,7 @@ class TManager:
         self.os_task = esp.os_task(callback=lambda tm: self.handler(tm))
         self.dqueues = dict()
         self.bhandler = ButtonHandler()
+        self.wem = WifiEventManager()
 
     def add_q(self, name, qq):
         if name not in self.dqueues:
