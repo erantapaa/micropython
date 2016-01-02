@@ -29,13 +29,16 @@ class SM:
 
     def link_over(self, phone_ip):
         print("over done", phone_ip)
-        self.indicator.mode(Indicator.OFF)
+        self.indicator.indicate(self.iostate)
         esp.smartconfig.stop()
 
-    def start(self):
+    def start(self, iostate):
+        self.iostate = iostate
+        self.running = True
         esp.smartconfig.start()
 
     def stop(self):
+        self.running = False
         esp.smartconfig.stop()
 
     def __init__(self, indicator):
@@ -45,6 +48,8 @@ class SM:
                              link=lambda ssid, password: self.link(ssid, password),
                              link_over=lambda phone_ip: self.link_over(phone_ip))
         self.indicator = indicator
+        self.running = False
+
 
 
 
@@ -56,48 +61,48 @@ class ButtonHandler:
     STATE_CLICK_CONFIRM_CONFIG = 1
     STATE_CLICK_IN_CONFIG = 2
 
-    def __init__(self, period=2000):
+    def __init__(self, period=750):
         self.state = self.STATE_BUTTON_START
         self.start_time = 0
         self.period = period
         self.click_state = self.STATE_CLICK_START
         self.indicator = Indicator()
         self.smartconfig = SM(self.indicator)
-        self.smart_running = False
+        self.iostate = False
 
     def timer_finish(self):
-#        print("Events")
-#        for ii in self.events:
-#            print(ii)
+        print("Events")
+        for ii in self.events:
+            print(ii)
 
         zero_count = len([ii for ii in self.events if ii[0] == 0])
         if self.click_state == self.STATE_CLICK_START:
             if zero_count == 2:
-                print("easyconfig")
-                if self.smart_running:
+                print("maybe easyconfig, cancel exiting easyconfig")
+                if self.smartconfig.running:
+                    print("already running so cancel")
                     self.smartconfig.stop()
-                self.indicator.blink(period=200)
+                self.indicator.blink(period=100)
                 self.click_state = self.STATE_CLICK_CONFIRM_CONFIG
         elif self.click_state == self.STATE_CLICK_CONFIRM_CONFIG:
             if zero_count == 2:
-                self.smart_running = True
-                self.smartconfig.start()
+                print("double click confirmed easyconfig")
+                self.smartconfig.start(self.iostate)
                 self.click_state = self.STATE_CLICK_IN_CONFIG
-                self.indicator.blink()
+                self.indicator.blink(period=500)
             else:
                 print("no easyconfig")
                 self.click_state = self.STATE_CLICK_START
         elif self.click_state == self.STATE_CLICK_IN_CONFIG:
-            print("cancel config")
+            print("cancel double click mode")
             self.click_state = self.STATE_CLICK_START
 
         self.state = self.STATE_BUTTON_START
 
     def handle(self, button_value):
         if button_value == 0:
-            self.indicator.mode(Indicator.ON)
-        else:
-            self.indicator.mode(Indicator.OFF)
+            self.iostate = not self.iostate
+            self.indicator.indicate(self.iostate)
 
         if self.state == self.STATE_BUTTON_START:
             self.start_time = pyb.millis()

@@ -52,3 +52,8 @@ class Indicator:
         self.pin_setter.off()
         self.state = self.OFF
 
+    def indicate(self, state):
+        if state:
+            self.on()
+        else:
+            self.off()
