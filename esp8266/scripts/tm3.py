@@ -1,6 +1,7 @@
 import esp
 import pyb
 import network
+from indicator import Indicator
 
 # button
 # smartconfig
@@ -45,36 +46,6 @@ class SM:
                              link_over=lambda phone_ip: self.link_over(phone_ip))
         self.indicator = indicator
 
-
-class Indicator:
-    ON = 0
-    OFF = 1
-
-    def __init__(self):
-        esp.gpio.p16_init()
-        self.timer = None
-        self.mode(self.OFF)
-
-    def timer_target(self):
-        if self.state == self.ON:
-            esp.gpio.p16_write(self.OFF)
-            self.state = self.OFF
-        else:
-            esp.gpio.p16_write(self.ON)
-            self.state = self.ON
-
-    def blink(self, period=100):
-        if self.timer:
-            self.timer.cancel
-            self.timer = None
-        self.timer = esp.os_timer(lambda timer: self.timer_target(), period=period)
-
-    def mode(self, state):
-        if self.timer:
-            self.timer.cancel()
-            self.timer = None
-        esp.gpio.p16_write(state)
-        self.state = state
 
 
 class ButtonHandler:
