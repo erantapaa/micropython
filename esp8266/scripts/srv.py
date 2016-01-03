@@ -22,16 +22,11 @@ class ControlServer:
                 self.state = 'header'
             elif self.state == 'header':
                 if ii == b'':
-                    self.state = 'blank'
+                    self.state = 'body'
                     continue
                 hdr = re.search('^(.*): *(.*)$', ii)
                 if not hdr:
                     print("did not match '%s'" % ii)
-
-            elif self.state == 'blank':
-                if ii != b'':
-                    print("missing blank")
-                self.state = 'body'
 
             elif self.state == 'body':
                 if ii == b'':
@@ -58,7 +53,7 @@ class ControlServer:
         self.socket.listen(1)
 
 
-def jsh(data):
-    print("got %s\n" % str(data))
+#def jsh(data):
+#    print("got %s\n" % str(data))
 
-cs = ControlServer(data_cb=jsh)
+#cs = ControlServer(data_cb=jsh)

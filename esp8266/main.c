@@ -40,7 +40,7 @@
 #include "user_interface.h"
 
 // STATIC char heap[16384];
-STATIC char heap[20000];
+STATIC char heap[25000];
 
 STATIC void  ICACHE_FLASH_ATTR mp_reset(void) {
     mp_stack_set_limit(10240);

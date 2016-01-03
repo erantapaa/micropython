@@ -125,9 +125,26 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t wifi_events_init(mp_uint_t n_args, const mp_ob
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(wifi_events_init_obj, 0, wifi_events_init);
 
+
+// TODO: make events dns pass a tuple to the lambda and make thus common
+STATIC mp_obj_t ICACHE_FLASH_ATTR wifi_events_status(void) {
+    struct ip_info info;
+
+    wifi_get_ip_info(0, &info);
+    mp_obj_t tuple[3] = {
+        netutils_format_ipv4_addr((uint8_t *)&info.ip.addr, NETUTILS_BIG),
+        netutils_format_ipv4_addr((uint8_t *)&info.netmask.addr, NETUTILS_BIG),
+        netutils_format_ipv4_addr((uint8_t *)&info.gw.addr, NETUTILS_BIG)
+    };
+    return mp_obj_new_tuple(3, tuple);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(wifi_events_status_obj, wifi_events_status);
+
+
 STATIC const mp_map_elem_t mo_module_esp_wifi_events_globals_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_wifi_events)},
     {MP_OBJ_NEW_QSTR(MP_QSTR_init), (mp_obj_t)&wifi_events_init_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_status), (mp_obj_t)&wifi_events_status_obj},
 };
 
 STATIC MP_DEFINE_CONST_DICT(mo_module_esp_wifi_events_globals, mo_module_esp_wifi_events_globals_table);

@@ -1,8 +1,10 @@
 import esp
 import pyb
+import gc
 import network
 from indicator import Indicator
 from wifi_events import WifiEventManager
+from srv import ControlServer
 
 # button
 # smartconfig
@@ -124,11 +126,15 @@ class TManager:
                 else:
                     print("kk %s val %s" % (kk, str(yy)))
 
+    def web(self, json):
+        print("web %s" % str(json))
+
     def __init__(self):
         self.os_task = esp.os_task(callback=lambda tm: self.handler(tm))
         self.dqueues = dict()
         self.bhandler = ButtonHandler()
         self.wem = WifiEventManager()
+        cs = ControlServer(data_cb=lambda json: self.web(json))
 
     def add_q(self, name, qq):
         if name not in self.dqueues:
@@ -141,3 +147,8 @@ storage = [0 for kk in range(4)]
 bq = esp.queue(storage, os_task=tm.os_task)
 esp.gpio.attach(0, queue=bq, debounce=20)
 tm.add_q('button', bq)
+
+def jsh(data):
+    print("got %s\n" % str(data))
+    gc.collect()
+
