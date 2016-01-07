@@ -31,6 +31,7 @@
 #include "py/smallint.h"
 #include "py/objint.h"
 #include "py/objstr.h"
+#include "py/objtype.h"
 #include "py/runtime0.h"
 #include "py/runtime.h"
 #include "py/builtin.h"
@@ -196,6 +197,7 @@ STATIC mp_obj_t mp_builtin_dir(mp_uint_t n_args, const mp_obj_t *args) {
     // TODO make this function more general and less of a hack
 
     mp_obj_dict_t *dict = NULL;
+    mp_map_t *members = NULL;
     if (n_args == 0) {
         // make a list of names in the local name space
         dict = mp_locals_get();
@@ -214,6 +216,10 @@ STATIC mp_obj_t mp_builtin_dir(mp_uint_t n_args, const mp_obj_t *args) {
                 dict = type->locals_dict;
             }
         }
+        if (mp_obj_is_instance_type(mp_obj_get_type(args[0]))) {
+            mp_obj_instance_t *inst = MP_OBJ_TO_PTR(args[0]);
+            members = &inst->members;
+        }
     }
 
     mp_obj_t dir = mp_obj_new_list(0, NULL);
@@ -224,7 +230,13 @@ STATIC mp_obj_t mp_builtin_dir(mp_uint_t n_args, const mp_obj_t *args) {
             }
         }
     }
-
+    if (members != NULL) {
+        for (mp_uint_t i = 0; i < members->alloc; i++) {
+            if (MP_MAP_SLOT_IS_FILLED(members, i)) {
+                mp_obj_list_append(dir, members->table[i].key);
+            }
+        }
+    }
     return dir;
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_dir_obj, 0, 1, mp_builtin_dir);
@@ -552,11 +564,19 @@ STATIC mp_obj_t mp_builtin_hasattr(mp_obj_t object_in, mp_obj_t attr_in) {
 }
 MP_DEFINE_CONST_FUN_OBJ_2(mp_builtin_hasattr_obj, mp_builtin_hasattr);
 
+STATIC mp_obj_t mp_builtin_globals(void) {
+    return MP_OBJ_FROM_PTR(mp_globals_get());
+}
+MP_DEFINE_CONST_FUN_OBJ_0(mp_builtin_globals_obj, mp_builtin_globals);
+
+STATIC mp_obj_t mp_builtin_locals(void) {
+    return MP_OBJ_FROM_PTR(mp_locals_get());
+}
+MP_DEFINE_CONST_FUN_OBJ_0(mp_builtin_locals_obj, mp_builtin_locals);
+
 // These are defined in terms of MicroPython API functions right away
 MP_DEFINE_CONST_FUN_OBJ_1(mp_builtin_id_obj, mp_obj_id);
 MP_DEFINE_CONST_FUN_OBJ_1(mp_builtin_len_obj, mp_obj_len);
-MP_DEFINE_CONST_FUN_OBJ_0(mp_builtin_globals_obj, mp_globals_get);
-MP_DEFINE_CONST_FUN_OBJ_0(mp_builtin_locals_obj, mp_locals_get);
 
 STATIC const mp_rom_map_elem_t mp_module_builtins_globals_table[] = {
     // built-in core functions

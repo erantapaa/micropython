@@ -1,9 +1,10 @@
 /*
- * This file is part of the Micro Python project, http://micropython.org/
+ * This file is part of the MicroPython project, http://micropython.org/
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2014 Damien P. George
+ * Copyright (c) 2014-2016 Damien P. George
+ * Copyright (c) 2016 Paul Sokolovsky
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,18 +24,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef __MICROPY_INCLUDED_PY_OBJEXCEPT_H__
-#define __MICROPY_INCLUDED_PY_OBJEXCEPT_H__
 
-#include "py/obj.h"
-#include "py/objtuple.h"
+// This file contains cumulative declarations for extmod/ .
 
-typedef struct _mp_obj_exception_t {
-    mp_obj_base_t base;
-    mp_uint_t traceback_alloc : (BITS_PER_WORD / 2);
-    mp_uint_t traceback_len : (BITS_PER_WORD / 2);
-    size_t *traceback_data;
-    mp_obj_tuple_t *args;
-} mp_obj_exception_t;
+#include <stddef.h>
+#include "py/runtime.h"
 
-#endif // __MICROPY_INCLUDED_PY_OBJEXCEPT_H__
+MP_DECLARE_CONST_FUN_OBJ(mp_uos_dupterm_obj);
+
+#if MICROPY_PY_OS_DUPTERM
+void mp_uos_dupterm_tx_strn(const char *str, size_t len);
+#else
+#define mp_uos_dupterm_tx_strn(s, l)
+#endif
