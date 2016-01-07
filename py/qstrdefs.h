@@ -655,9 +655,11 @@ Q(slip)
 Q(status)
 #endif
 #endif
+
 #if MICROPY_MODULE_ESP_QUEUE
 Q(Empty)
 Q(Full)
+#endif
 
 #if MICROPY_FSUSERMOUNT
 // for user-mountable block devices
