@@ -285,7 +285,7 @@ STATIC ICACHE_FLASH_ATTR void dht_host_up(void *parg)
 } 
 
 
-STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_state(mp_obj_t self_in, mp_obj_t len_in) {
+STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_state(mp_obj_t self_in) {
     mp_obj_dht_t *self = self_in;
     return mp_obj_new_int(self->state);
 }
@@ -328,7 +328,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_esp_dht_values_obj, 1, mod_esp_dht_values)
 
 #define MIN_DHT_CYCLE_TIME 2000
 
-STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t len_in) {
+STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in) {
     mp_obj_dht_t *self = self_in;
 
     uint32_t elapsed =  (system_get_time() / 1000 - self->last_read_time);
@@ -350,7 +350,7 @@ STATIC mp_obj_t ICACHE_FLASH_ATTR  mod_esp_dht_recv(mp_obj_t self_in, mp_obj_t l
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_dht_recv_obj, mod_esp_dht_recv);
 
-STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_test(mp_obj_t self_in, mp_obj_t len_in) {
+STATIC mp_obj_t ICACHE_FLASH_ATTR mod_esp_dht_test(mp_obj_t self_in) {
     // mp_obj_dht_t *self = self_in;
     return mp_const_none;
 }

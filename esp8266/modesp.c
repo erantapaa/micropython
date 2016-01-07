@@ -119,6 +119,7 @@ STATIC mp_obj_t esp_socket_close(mp_obj_t self_in) {
     esp_socket_obj_t *s = self_in;
 
     if (esp_socket_listening == s) {
+        gc_free(esp_socket_listening);
         esp_socket_listening = NULL;
     }
 
@@ -612,7 +613,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_flash_id_obj, esp_flash_id);
 
 
 // STATIC mp_obj_t ICACHE_FLASH_ATTR esp__init__() {
-STATIC mp_obj_t esp__init__(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t esp__init__() {
     esp_os_task_init();
     esp_gpio_init();
     return mp_const_none;

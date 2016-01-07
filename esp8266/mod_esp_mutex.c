@@ -117,13 +117,13 @@ void ICACHE_FLASH_ATTR acquire_or_raise(mp_obj_t py_obj_in) {
     }
 }
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_acquire(mp_obj_t self_in, mp_obj_t len_in) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_acquire(mp_obj_t self_in) {
     acquire_or_raise(self_in);
     return mp_obj_new_bool(1);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_mutex_acquire_obj, mod_esp_mutex_acquire);
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_release(mp_obj_t self_in, mp_obj_t lambda_in) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_mutex_release(mp_obj_t self_in) {
     esp_mutex_obj_t *self = self_in;
 
     esp_release_mutex(&self->mutex);

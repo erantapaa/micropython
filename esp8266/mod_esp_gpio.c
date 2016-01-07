@@ -55,8 +55,6 @@
 #include "mod_esp_gpio.h"
 #include "mod_esp_queue.h"
 
-extern void *pvPortMalloc(size_t xWantedSize, const char *file, const char *line);
-
 #define TIME system_get_time
 
 #if 0
@@ -129,7 +127,7 @@ void ICACHE_FLASH_ATTR esp_gpio_init() {
     ETS_GPIO_INTR_ATTACH(def_isr, NULL);
 }
 
-STATIC mp_obj_t ICACHE_FLASH_ATTR esp_gpio_print(mp_obj_t self_in, mp_obj_t len_in) {
+STATIC mp_obj_t ICACHE_FLASH_ATTR esp_gpio_print() {
     const pmap_t *pmi = pin_map;
     for (int pin = 0; pin < NPINS; pin++, pmi++) {
         printf("pin %d handler %x last = %d\n", pin, (unsigned int)pmi->isr, pmi->last_result);
@@ -161,7 +159,7 @@ void ICACHE_FLASH_ATTR esp_gpio_isr_attach(pmap_t *pmp, isr_t vect, void *data, 
     if (n_events) {
         if (!pmp->events) {
             // os_free(pmp->events);
-            pmp->events = (event_t *)os_malloc(n_events * sizeof (event_t));
+            pmp->events = (event_t *)m_new(event_t, n_events);
             pmp->n_events = n_events;
         } else if (pmp->n_events != n_events) {
             printf("not new and a new event count. Keeping old size\n");

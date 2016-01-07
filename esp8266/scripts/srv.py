@@ -53,7 +53,7 @@ class ControlServer:
         self.socket.listen(1)
 
 
-#def jsh(data):
-#    print("got %s\n" % str(data))
+def jsh(data):
+    print("got %s\n" % str(data))
 
-#cs = ControlServer(data_cb=jsh)
+cs = ControlServer(data_cb=jsh)

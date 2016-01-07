@@ -79,7 +79,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_make_new(mp_obj_t type_in, mp_ui
 }
 
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_reset(mp_obj_t self_in, mp_obj_t len_in) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_reset(mp_obj_t self_in) {
     esp_1wire_obj_t *self = self_in;
 
     gpio_pin_intr_state_set(GPIO_ID_PIN(self->gpio->pin), GPIO_PIN_INTR_DISABLE);

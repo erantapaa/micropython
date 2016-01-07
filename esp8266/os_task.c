@@ -83,7 +83,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_task_make_new(mp_obj_t type_in, mp_uint
 }
 
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_task_post(mp_obj_t self_in, mp_obj_t len_in) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_task_post(mp_obj_t self_in) {
     esp_os_task_obj_t *self = self_in;
     system_os_post(SENSOR_TASK_ID, 1, (os_param_t)self);
     return mp_const_none;
