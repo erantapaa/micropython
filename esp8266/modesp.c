@@ -121,6 +121,9 @@ STATIC mp_obj_t esp_socket_close(mp_obj_t self_in) {
     if (esp_socket_listening == s) {
         gc_free(esp_socket_listening);
         esp_socket_listening = NULL;
+        printf("sock listening == s, gc_free");
+    } else {
+        printf("sock listening != s, gc_free");
     }
 
     if (s->espconn->state != ESPCONN_NONE && s->espconn->state != ESPCONN_CLOSE) {
@@ -128,9 +131,10 @@ STATIC mp_obj_t esp_socket_close(mp_obj_t self_in) {
     }
 
     if (s->connlist != NULL) {
+        printf("connlist set len 0");
         mp_obj_list_set_len(s->connlist, 0);
     }
-
+    s->recvbuf = NULL;
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_socket_close_obj, esp_socket_close);
@@ -141,7 +145,9 @@ STATIC mp_obj_t esp_socket___del__(mp_obj_t self_in) {
 
     esp_socket_close(self_in);
 
+    printf("__del__ deleted\n");
     if (s->fromserver) {
+        printf("server deleted\n");
         espconn_delete(s->espconn);
     }
 
@@ -166,22 +172,31 @@ STATIC void esp_socket_recv_callback(void *arg, char *pdata, unsigned short len)
     esp_socket_obj_t *s = conn->reverse;
 
     if (s->cb_recv != mp_const_none) {
+        printf("new bytes\n");
         call_function_2_protected(s->cb_recv, s, mp_obj_new_bytes((byte *)pdata, len));
     } else {
         if (s->recvbuf == NULL) {
+            printf("recv null \n");
             s->recvbuf = m_new(uint8_t, len);
             s->recvbuf_len = len;
             if (s->recvbuf != NULL) {
                 memcpy(s->recvbuf, pdata, len);
+            } else {
+                printf("failed alloc 1\n");
             }
         } else {
+            printf("recv not null renew \n");
             s->recvbuf = m_renew(uint8_t, s->recvbuf, s->recvbuf_len, s->recvbuf_len + len);
             if (s->recvbuf != NULL) {
                 memcpy(&s->recvbuf[s->recvbuf_len], pdata, len);
                 s->recvbuf_len += len;
+                printf("rnew\n");
+            } else {
+                printf("failed alloc 3\n");
             }
         }
         if (s->recvbuf == NULL) {
+            printf("close 2\n");
             esp_socket_close(s);
             return;
         }
@@ -204,6 +219,8 @@ STATIC void esp_socket_disconnect_callback(void *arg) {
     if (s->cb_disconnect != mp_const_none) {
         call_function_1_protected(s->cb_disconnect, s);
     }
+    s->recvbuf = NULL;
+    printf("close\n");
     esp_socket_close(s);
 }
 
@@ -214,6 +231,8 @@ STATIC void esp_socket_reconnect_callback(void *arg, sint8 err) {
     if (s->cb_reconnect != mp_const_none) {
         call_function_1_protected(s->cb_reconnect, s);
     }
+    s->recvbuf = NULL;
+    printf("reconnect\n");
     esp_socket_close(s);
 }
 
@@ -276,6 +295,7 @@ STATIC mp_obj_t esp_socket_accept(mp_obj_t self_in) {
         nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError,
             "not listening"));
     }
+    printf("in accept\n");
 
     do {
         mp_uint_t len;
@@ -288,6 +308,7 @@ STATIC mp_obj_t esp_socket_accept(mp_obj_t self_in) {
 
         esp_socket_obj_t *rs = items[0];
         mp_obj_list_remove(s->connlist, rs);
+        printf("connlist remove\n");
         if (rs->espconn->state != ESPCONN_CLOSE) {
             return rs;
         }
@@ -333,7 +354,12 @@ STATIC mp_obj_t esp_socket_send(mp_obj_t self_in, mp_obj_t buf_in) {
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(buf_in, &bufinfo, MP_BUFFER_READ);
 
-    espconn_sent(s->espconn, bufinfo.buf, bufinfo.len);
+    int32_t err;
+    printf("Send '%.*s'\n", bufinfo.len, (char *)bufinfo.buf);
+    if ((err = espconn_sent(s->espconn, bufinfo.buf, bufinfo.len)) !=  ESPCONN_OK) {
+        printf("espcon err %d\n", err);
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, "espconn_sent Not OK"));
+    }
 
     return mp_obj_new_int(bufinfo.len);
 }
@@ -356,6 +382,7 @@ STATIC mp_obj_t esp_socket_recv(mp_obj_t self_in, mp_obj_t len_in) {
         return trt;
     } else {
         mp_obj_t trt = mp_obj_new_bytes(s->recvbuf, mxl);
+        printf("mmemmove\n");
         memmove(s->recvbuf, &s->recvbuf[mxl], s->recvbuf_len - mxl);
         s->recvbuf = m_renew(uint8_t, s->recvbuf, s->recvbuf_len, s->recvbuf_len - mxl);
         s->recvbuf_len -= mxl;
@@ -411,6 +438,7 @@ STATIC mp_obj_t esp_socket_onconnect(mp_obj_t self_in, mp_obj_t lambda_in) {
             }
 
             esp_socket_obj_t *rs = items[0];
+            printf("on connect connlist remove");
             mp_obj_list_remove(s->connlist, rs);
             if (s->espconn->state != ESPCONN_CLOSE) {
                 call_function_1_protected(s->cb_connect, rs);
