@@ -61,7 +61,7 @@ void mp_obj_tuple_print(const mp_print_t *print, mp_obj_t o_in, mp_print_kind_t 
     }
 }
 
-STATIC mp_obj_t mp_obj_tuple_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t mp_obj_tuple_make_new(const mp_obj_type_t *type_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     (void)type_in;
 
     mp_arg_check_num(n_args, n_kw, 0, 1, false);
@@ -208,7 +208,7 @@ STATIC mp_obj_t tuple_count(mp_obj_t self_in, mp_obj_t value) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(tuple_count_obj, tuple_count);
 
-STATIC mp_obj_t tuple_index(mp_uint_t n_args, const mp_obj_t *args) {
+STATIC mp_obj_t tuple_index(size_t n_args, const mp_obj_t *args) {
     assert(MP_OBJ_IS_TYPE(args[0], &mp_type_tuple));
     mp_obj_tuple_t *self = MP_OBJ_TO_PTR(args[0]);
     return mp_seq_index_obj(self->items, self->len, n_args, args);

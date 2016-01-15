@@ -121,10 +121,10 @@ STATIC NORETURN void syntax_error(void) {
     nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "syntax error in uctypes descriptor"));
 }
 
-STATIC mp_obj_t uctypes_struct_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC mp_obj_t uctypes_struct_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 2, 3, false);
     mp_obj_uctypes_struct_t *o = m_new_obj(mp_obj_uctypes_struct_t);
-    o->base.type = MP_OBJ_TO_PTR(type_in);
+    o->base.type = type;
     o->addr = (void*)(uintptr_t)mp_obj_get_int(args[0]);
     o->desc = args[1];
     o->flags = LAYOUT_NATIVE;
@@ -230,6 +230,9 @@ STATIC mp_uint_t uctypes_struct_size(mp_obj_t desc_in, int layout_type, mp_uint_
                 mp_uint_t offset = MP_OBJ_SMALL_INT_VALUE(v);
                 mp_uint_t val_type = GET_TYPE(offset, VAL_TYPE_BITS);
                 offset &= VALUE_MASK(VAL_TYPE_BITS);
+                if (val_type >= BFUINT8 && val_type <= BFINT32) {
+                    offset &= (1 << OFFSET_BITS) - 1;
+                }
                 mp_uint_t s = uctypes_struct_scalar_size(val_type);
                 if (s > *max_field_size) {
                     *max_field_size = s;

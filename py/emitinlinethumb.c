@@ -298,12 +298,13 @@ bad_arg:
     return 0;
 }
 
-STATIC int get_arg_i(emit_inline_asm_t *emit, const char *op, mp_parse_node_t pn, int fit_mask) {
-    if (!MP_PARSE_NODE_IS_SMALL_INT(pn)) {
+STATIC uint32_t get_arg_i(emit_inline_asm_t *emit, const char *op, mp_parse_node_t pn, uint32_t fit_mask) {
+    mp_obj_t o;
+    if (!mp_parse_node_get_int_maybe(pn, &o)) {
         emit_inline_thumb_error_exc(emit, mp_obj_new_exception_msg_varg(&mp_type_SyntaxError, "'%s' expects an integer", op));
         return 0;
     }
-    int i = MP_PARSE_NODE_LEAF_SMALL_INT(pn);
+    uint32_t i = mp_obj_get_int_truncated(o);
     if ((i & (~fit_mask)) != 0) {
         emit_inline_thumb_error_exc(emit, mp_obj_new_exception_msg_varg(&mp_type_SyntaxError, "'%s' integer 0x%x does not fit in mask 0x%x", op, i, fit_mask));
         return 0;
@@ -702,11 +703,10 @@ STATIC void emit_inline_thumb_op(emit_inline_asm_t *emit, qstr op, mp_uint_t n_a
                 goto op_movw_movt;
             } else if (ARMV7M && strcmp(op_str, "movwt") == 0) {
                 // this is a convenience instruction
-                // we clear the MSB since it might be set from extracting the small int value
                 mp_uint_t reg_dest = get_arg_reg(emit, op_str, pn_args[0], 15);
-                int i_src = get_arg_i(emit, op_str, pn_args[1], 0xffffffff);
+                uint32_t i_src = get_arg_i(emit, op_str, pn_args[1], 0xffffffff);
                 asm_thumb_mov_reg_i16(emit->as, ASM_THUMB_OP_MOVW, reg_dest, i_src & 0xffff);
-                asm_thumb_mov_reg_i16(emit->as, ASM_THUMB_OP_MOVT, reg_dest, (i_src >> 16) & 0x7fff);
+                asm_thumb_mov_reg_i16(emit->as, ASM_THUMB_OP_MOVT, reg_dest, (i_src >> 16) & 0xffff);
             } else if (ARMV7M && strcmp(op_str, "ldrex") == 0) {
                 mp_uint_t r_dest = get_arg_reg(emit, op_str, pn_args[0], 15);
                 mp_parse_node_t pn_base, pn_offset;
