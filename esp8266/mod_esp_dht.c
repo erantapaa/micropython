@@ -155,7 +155,7 @@ STATIC const mp_arg_t esp_dht_init_args[] = {
 #define ESP_DHT_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_dht_init_args)
 
 // takes (pin=x, task=yyy)
-STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t dht_make_new(const mp_obj_type_t *type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_val_t vals[ESP_DHT_INIT_NUM_ARGS];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, ESP_DHT_INIT_NUM_ARGS, esp_dht_init_args, vals);
 

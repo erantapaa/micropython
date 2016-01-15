@@ -50,7 +50,7 @@ STATIC ICACHE_FLASH_ATTR void mod_esp_I2C_print(const mp_print_t *print, mp_obj_
 
 
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_I2C_make_new(const mp_obj_type_t *type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     STATIC const mp_arg_t mod_esp_I2C_init_args[] = {
         { MP_QSTR_sda_pin, MP_ARG_INT, {.u_int = 2}},
         { MP_QSTR_scl_pin, MP_ARG_INT, {.u_int = 14}}

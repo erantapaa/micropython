@@ -58,7 +58,7 @@ STATIC ICACHE_FLASH_ATTR void mod_esp_1wire_print(const mp_print_t *print, mp_ob
     mp_printf(print, "pin=%d, ints=%d", self->gpio->pin, self->ints);
 }
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_1wire_make_new(const mp_obj_type_t *type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     STATIC const mp_arg_t mod_esp_1wire_init_args[] = {
         { MP_QSTR_pin, MP_ARG_INT|MP_ARG_REQUIRED},
         { MP_QSTR_edge, MP_ARG_INT | MP_ARG_KW_ONLY, {.u_int = GPIO_PIN_INTR_DISABLE}},     // 1

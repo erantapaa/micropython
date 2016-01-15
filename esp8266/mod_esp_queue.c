@@ -57,7 +57,7 @@ STATIC const mp_arg_t mod_esp_queue_init_args[] = {
 };
 #define ESP_MUTEX_INIT_NUM_ARGS MP_ARRAY_SIZE(mod_esp_queue_init_args)
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_queue_make_new(const mp_obj_type_t *type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_val_t vals[ESP_MUTEX_INIT_NUM_ARGS];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, ESP_MUTEX_INIT_NUM_ARGS, mod_esp_queue_init_args, vals);
 

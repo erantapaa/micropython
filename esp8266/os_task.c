@@ -72,7 +72,7 @@ STATIC const mp_arg_t esp_os_task_init_args[] = {
 };
 #define PYB_TASK_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_os_task_init_args)
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_task_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t esp_os_task_make_new(const mp_obj_type_t *type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
     mp_arg_val_t vals[PYB_TASK_INIT_NUM_ARGS];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, PYB_TASK_INIT_NUM_ARGS, esp_os_task_init_args, vals);
     
