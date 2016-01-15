@@ -85,6 +85,7 @@ SRC_C = \
 	mod_esp_smartconfig.c \
 	mod_esp_wifi_events.c \
 	rofl.c \
+	mod_esp_ws.c \
 	$(BUILD)/esp_frozen.c 
 
 
