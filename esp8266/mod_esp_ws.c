@@ -13,18 +13,33 @@
 
 #define IBLEN 200
 
-extern void *pvPortMalloc(size_t xWantedSize, const char *file, const char *line);
+extern void *pvPortMalloc(size_t xWantedSize, const char *file, int line);
+extern void vPortFree(void *ptr, const char *file, int line);
+extern void *pvPortRealloc(size_t xWantedSize, const char *file, int line);
+extern int skip_atoi(char **nptr);
 
-ctx_t *new_ctx(int len) {
-    ctx_t *ctx = (ctx_t *)pvPortMalloc(sizeof (ctx_t), "", "");
-    ctx->buffer = (char *)pvPortMalloc(len, "", "");
-    ctx->len = len;
+void ICACHE_FLASH_ATTR ctx_reset(ctx_t *ctx) {
     ctx->ptr = ctx->buffer;
     ctx->state = method;
+    ctx->content_length = 0;
+    ctx->method = none;
+}
+
+ctx_t ICACHE_FLASH_ATTR *ctx_new(int len) {
+    ctx_t *ctx = (ctx_t *)os_malloc(sizeof (ctx_t));
+    ctx->buffer = (char *)os_malloc(len);
+    ctx->len = len;
+    ctx_reset(ctx);
     return ctx;
 }
 
-void    add(ctx_t *ctx, char cc) {
+void ICACHE_FLASH_ATTR ctx_free(ctx_t *ctx) {
+    os_free(ctx->buffer);
+    ctx->buffer = NULL;
+    os_free(ctx);
+}
+
+void  ICACHE_FLASH_ATTR ctx_add(ctx_t *ctx, char cc) {
     if (ctx->ptr - ctx->buffer > ctx->len) {
         printf("overflow\n");
         return;
@@ -32,8 +47,8 @@ void    add(ctx_t *ctx, char cc) {
     *ctx->ptr++ = cc;
 }
 
-char *get(ctx_t *ctx) {
-    add(ctx, '\0');
+char ICACHE_FLASH_ATTR *ctx_get_reset(ctx_t *ctx) {
+    ctx_add(ctx, '\0');
     ctx->ptr = ctx->buffer;
     return ctx->buffer;
 }
@@ -41,14 +56,6 @@ char *get(ctx_t *ctx) {
 
 
 static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigned short length) {
-#if 0
-    printf("receive    |");
-    for (int ii  = 0; ii < length; ii++) {
-        printf("%c", *pusrdata++);
-    }
-    printf("|\n");
-#endif
-
     struct espconn *pesp_conn = arg;
     ctx_t *ctx = (ctx_t *)pesp_conn->reverse;
 
@@ -61,53 +68,76 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
         switch (ctx->state) {
         case method:
             if (cc == ' ') {
-                printf("method '%s'\n", get(ctx));
+                char *method = ctx_get_reset(ctx);
+                printf("method '%s'\n", method);
+                ctx->method = strcmp(method, "GET") == 0 ? get : other;
                 ctx->state = uri;
             } else {
-                add(ctx, cc);
+                ctx_add(ctx, cc);
             }
             break;
         case uri:
             if (cc == ' ') {
-                printf("uri '%s'\n", get(ctx));
+                printf("uri '%s'\n", ctx_get_reset(ctx));
                 ctx->state = http_version;
             } else {
-                add(ctx, cc);
+                ctx_add(ctx, cc);
             }
             break;
         case http_version:
             if (cc == '\n') {
-                printf("version '%s'\n", get(ctx));
+                printf("version '%s'\n", ctx_get_reset(ctx));
                 ctx->state = header_key;
             } else {
-                add(ctx, cc);
+                ctx_add(ctx, cc);
             }
             break;
         case header_key:
             if (cc == ':') {
-                printf("header key '%s'\n", get(ctx));
-                ctx->state = header_sep;
+                char *hname = ctx_get_reset(ctx);
+                printf("header key '%s'\n", hname);
+                if (strcmp("Content-Length", hname) == 0) {
+                    ctx->state = content_length_sep;
+                } else {
+                    ctx->state = header_sep;
+               }
             } else {
-                add(ctx, cc);
+                ctx_add(ctx, cc);
             }
             break;
+        case content_length_sep:
+            if (cc != ' ') {
+                ctx_add(ctx, cc);
+                ctx->state = content_length;
+            }
+            break;
+        case content_length:
+            if (cc == '\n') {
+                char *clength = ctx_get_reset(ctx);
+                ctx->content_length = skip_atoi(&clength);
+                ctx->state = possible_body;
+            } else {
+                ctx_add(ctx, cc);
+            }
+            break;
+
         case header_sep:
             if (cc != ' ') {
-                add(ctx, cc);
+                ctx_add(ctx, cc);
                 ctx->state = header_val;
             }
             break;
         case header_val:
             if (cc == '\n') {
-                printf("header val '%s'\n", get(ctx));
+                printf("header val '%s'\n", ctx_get_reset(ctx));
                 ctx->state = possible_body;
             } else {
-                add(ctx, cc);
+                ctx_add(ctx, cc);
             }
             break;
         case possible_body:
             if (cc != '\n') {
-                add(ctx, cc);
+                ctx_add(ctx, cc);
                 ctx->state = header_key;
             } else {
                 ctx->state = body_sep;
@@ -115,23 +145,35 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             break;
         case body_sep:
             if (cc != '\n') {
-                add(ctx, cc);
+                ctx_add(ctx, cc);
                 ctx->state = body;
             } // else bad state
             break;
         case body:
-            if (cc == -1) {
-                printf("body '%s'\n", get(ctx));
-                exit(0);
-            } else {
-                add(ctx, cc);
-            }
+            ctx_add(ctx, cc);
             break;
         }
-        
     }
-    if (ctx->state == body) {
-        printf("body '%s'\n", get(ctx));
+    if (ctx->method == get && ctx->state == body_sep) {
+            printf("length body '%s'\n", ctx_get_reset(ctx));
+            const char *body = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 18\r\n\r\n"
+                               "{\"result\": \"OK\"}\r\n";
+            printf("GET sending '%s'", body);
+            espconn_sent(pesp_conn, (uint8 *)body, (uint16)strlen((const char *)body));
+    } else if (ctx->state == body) {
+        int size = ctx->ptr - ctx->buffer;
+        if (size) {
+            printf("expect %d got %d\n", ctx->content_length, size);
+            if (ctx->content_length == ctx->content_length) {
+                printf("length body '%s'\n", ctx_get_reset(ctx));
+                const char *body = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 18\r\n\r\n"
+                                   "{\"result\": \"OK\"}\r\n";
+                printf("sending '%s'", body);
+                espconn_sent(pesp_conn, (uint8 *)body, (uint16)strlen((const char *)body));
+            } else {
+                printf("body '%s'\n", ctx_get_reset(ctx));
+            }
+        }
     }
     return;
 }
@@ -151,6 +193,15 @@ static void ICACHE_FLASH_ATTR webserver_discon(void *arg)
 {
     struct espconn *pesp_conn = arg;
 
+    ctx_t *ctx = (ctx_t *)pesp_conn->reverse;
+    if (!ctx) {
+        printf("no context");
+    } else {
+        if (ctx->state == body && (ctx->ptr - ctx->buffer)) {
+            printf("body '%s'\n", ctx_get_reset(ctx));
+        }
+        ctx_free(ctx);
+    }
     printf("disconnect | %d.%d.%d.%d:%d \n",
 		   pesp_conn->proto.tcp->remote_ip[0],
 		   pesp_conn->proto.tcp->remote_ip[1],
@@ -169,7 +220,7 @@ static void ICACHE_FLASH_ATTR webserver_listen(void *arg)
 		   pesp_conn->proto.tcp->remote_ip[3],
 		   pesp_conn->proto.tcp->remote_port);
 
-    pesp_conn->reverse = new_ctx(IBLEN);
+    pesp_conn->reverse = ctx_new(IBLEN);
     espconn_regist_recvcb(pesp_conn, webserver_recv);
     espconn_regist_reconcb(pesp_conn, webserver_recon);
     espconn_regist_disconcb(pesp_conn, webserver_discon);
