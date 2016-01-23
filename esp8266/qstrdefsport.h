@@ -250,3 +250,7 @@ Q(stamode_connected)
 Q(stamode_disconnected)
 Q(stamode_authmode_change)
 Q(stamode_got_ip)
+
+// mod_ws
+Q(ws)
+Q(port)

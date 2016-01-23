@@ -107,15 +107,8 @@ static pmap_t *gpio;
 
 void rofl(const char *arg, int arg2) {
     uint8_t arr[MAXI];
-        extern int do_listen(int port);
 
     switch (arg[0]) {
-    case 'S':
-        printf("server");
-        do_listen(80);
-        printf("running");
-        break;
-
     case 'v':
         printf("SDK version:%x '%s'\n", (unsigned)system_get_sdk_version(), system_get_sdk_version());
         break;

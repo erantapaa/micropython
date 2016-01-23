@@ -51,6 +51,7 @@
 #include "mod_esp_queue.h"
 #include "mod_esp_smartconfig.h"
 #include "mod_esp_wifi_events.h"
+#include "mod_esp_ws.h"
 
 #define MODESP_ESPCONN (1)
 
@@ -697,6 +698,7 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_smartconfig), (mp_obj_t)&mp_module_esp_smartconfig},
     { MP_OBJ_NEW_QSTR(MP_QSTR_wifi_events), (mp_obj_t)&mp_module_esp_wifi_events},
     { MP_OBJ_NEW_QSTR(MP_QSTR_getaddrinfo), (mp_obj_t)&esp_getaddrinfo_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_ws), (mp_obj_t)&esp_ws_type },
     #endif
 
 #if MODESP_INCLUDE_CONSTANTS
