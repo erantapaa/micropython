@@ -1,7 +1,8 @@
 #ifndef _INCLUDED_MOD_ES_WS_H_
 #define _INCLUDED_MOD_ES_WS_H_
 
-typedef struct ctx_s {
+typedef struct _esp_ws_obj_t {
+    mp_obj_base_t base;
     char *buffer;
     char *ptr;
     int bp;
@@ -13,11 +14,9 @@ typedef struct ctx_s {
     int content_length;
     enum { get, other, none}  method;
     mp_obj_t header_key;
+    mp_obj_t header_val;
+    mp_obj_t header_kp;
     mp_obj_t headers;
-} ctx_t;
-
-typedef struct _esp_ws_obj_t {
-    mp_obj_base_t base;
     struct espconn esp_conn;
     esp_tcp esptcp;
     bool accepting;
