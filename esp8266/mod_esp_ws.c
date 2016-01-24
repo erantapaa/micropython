@@ -18,7 +18,6 @@
 
 #include "mod_esp_ws.h"
 
-#define IBLEN 200
 
 extern int skip_atoi(char **nptr);
 int ets_sprintf(char *str, const char *format, ...);
@@ -39,7 +38,7 @@ void ICACHE_FLASH_ATTR ctx_reset(esp_ws_obj_t *ctx) {
 
 void  ICACHE_FLASH_ATTR ctx_add(esp_ws_obj_t *ctx, char cc) {
     if (ctx->ptr - ctx->buffer > ctx->len) {
-        printf("overflow\n");
+        printf("buffer_size overflow\n");
         return;
     }
     *ctx->ptr++ = cc;
@@ -85,7 +84,6 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
     char body_size_str[20];
     ets_sprintf(body_size_str, "%d\r\n\r\n", body_size);
     int body_size_str_len = strlen(body_size_str);
-
     int total_len = body_base_size + body_size_str_len + body_size;
 
     pesp->to_send = (char *)m_malloc(total_len);
@@ -211,15 +209,13 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
     } else if (pesp->state == body) {
         int size = pesp->ptr - pesp->buffer;
         if (size) {
-            printf("expect %d got %d\n", pesp->content_length, size);
             if (pesp->content_length == pesp->content_length) {
-                printf("length body '%s'\n", ctx_get_reset(pesp));
-                const char *body = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 18\r\n\r\n"
-                                   "{\"result\": \"OK\"}\r\n";
-                printf("sending '%s'", body);
-                espconn_sent(pesp_conn, (uint8 *)body, (uint16)strlen((const char *)body));
+                pesp->body = ctx_str_reset(pesp);
+                ws_reply(pesp, pesp_conn);
             } else {
-                printf("body '%s'\n", ctx_get_reset(pesp));
+                ctx_add(pesp, '\0');    // go through this for out by one overflow check
+                pesp->ptr--;
+                printf("different body '%s'\n", pesp->buffer);
             }
         }
     }
@@ -239,23 +235,11 @@ static void  ICACHE_FLASH_ATTR webserver_recon(void *arg, sint8 err)
 
 static void ICACHE_FLASH_ATTR webserver_discon(void *arg)
 {
-//    struct espconn *pesp_conn = arg;
     esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
-
-#if 0
-    printf("disconnect | %d.%d.%d.%d:%d \n",
-		   pesp_conn->proto.tcp->remote_ip[0],
-		   pesp_conn->proto.tcp->remote_ip[1],
-		   pesp_conn->proto.tcp->remote_ip[2],
-		   pesp_conn->proto.tcp->remote_ip[3],
-		   pesp_conn->proto.tcp->remote_port);
-#endif
-    if (pesp->state == body && (pesp->ptr - pesp->buffer)) {
-        printf("body '%s'\n", ctx_get_reset(pesp));
-    }
     ctx_reset(pesp);
     gc_collect();
 }
+
 static void ICACHE_FLASH_ATTR socket_sent_callback(void *arg) {
     esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
     m_free(pesp->to_send);
@@ -264,15 +248,6 @@ static void ICACHE_FLASH_ATTR socket_sent_callback(void *arg) {
 static void ICACHE_FLASH_ATTR webserver_listen(void *arg)
 {
     struct espconn *pesp_conn = arg;
-#if 0
-    printf("connect    | %d.%d.%d.%d:%d \n",
-		   pesp_conn->proto.tcp->remote_ip[0],
-		   pesp_conn->proto.tcp->remote_ip[1],
-		   pesp_conn->proto.tcp->remote_ip[2],
-		   pesp_conn->proto.tcp->remote_ip[3],
-		   pesp_conn->proto.tcp->remote_port);
-#endif
-//    esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
     espconn_regist_recvcb(pesp_conn, webserver_recv);
     espconn_regist_reconcb(pesp_conn, webserver_recon);
     espconn_regist_disconcb(pesp_conn, webserver_discon);
@@ -283,6 +258,7 @@ static void ICACHE_FLASH_ATTR webserver_listen(void *arg)
 STATIC const mp_arg_t esp_ws_init_args[] = {
     { MP_QSTR_callback, MP_ARG_OBJ, {.u_obj = mp_const_none}},
     { MP_QSTR_port, MP_ARG_INT, {.u_int = 80}},
+    { MP_QSTR_buffer_size, MP_ARG_INT, {.u_int = 200}}
 };
 #define ESP_WS_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_ws_init_args)
 
@@ -300,8 +276,8 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_ws_make_new(const mp_obj_type_t *type_in, 
 	self->esp_conn.proto.tcp->local_port = vals[1].u_int;
     self->esp_conn.reverse = self;
     self->accepting = false;
-    self->buffer = (char *)m_malloc(IBLEN);
-    self->len = IBLEN;
+    self->len = vals[2].u_int;
+    self->buffer = (char *)m_malloc(self->len);
     ctx_reset(self);
 	espconn_regist_connectcb(&self->esp_conn, webserver_listen);
     return self;
@@ -339,8 +315,8 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_headers(mp_obj_t self_in) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_headers_obj, mod_esp_ws_headers);
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_body(mp_obj_t self_in) {
-//    esp_ws_obj_t *self = self_in;
-    return mp_const_none;
+    esp_ws_obj_t *self = self_in;
+    return self->body;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_body_obj, mod_esp_ws_body);
 
