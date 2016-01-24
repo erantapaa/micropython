@@ -14,6 +14,8 @@
 
 #include "espconn.h"
 
+#include "gccollect.h"
+
 #include "mod_esp_ws.h"
 
 #define IBLEN 200
@@ -26,10 +28,9 @@ void ICACHE_FLASH_ATTR ctx_reset(esp_ws_obj_t *ctx) {
     ctx->content_length = 0;
     ctx->method = none;
     ctx->header_key = mp_const_none;
-    ctx->header_val = mp_const_none;
-    ctx->header_kp = mp_const_none;
-    ctx->headers = mp_const_none; // mp_obj_new_list(0, NULL);
-    printf("reset\n");
+    ctx->headers = mp_obj_new_list(0, NULL);
+    ctx->uri = mp_const_none;
+    ctx->str_method = mp_const_none;
 }
 
 
@@ -55,6 +56,11 @@ char ICACHE_FLASH_ATTR *ctx_get_reset(esp_ws_obj_t *ctx) {
     return ctx->buffer;
 }
 
+char ICACHE_FLASH_ATTR *ctx_str_reset(esp_ws_obj_t *ctx) {
+    mp_obj_t bp = mp_obj_new_str(ctx->buffer, ctx->ptr - ctx->buffer, true);
+    ctx->ptr = ctx->buffer;
+    return bp;
+}
 
 
 static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigned short length) {
@@ -63,7 +69,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
 
     for (int pos = 0; pos < length; pos++) {
         uint8_t cc = pusrdata[pos];
-        // printf("state %d '%c'\n", ctx->state, cc);
+        // printf("state %d '%c'\n", pesp->state, cc);
         if (cc == '\r') {
             continue;
         }
@@ -71,7 +77,8 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
         case method:
             if (cc == ' ') {
                 char *method = ctx_get_reset(pesp);
-                // printf("method '%s'\n", method);
+                pesp->str_method =  mp_obj_new_str(method, strlen(method), true);
+
                 pesp->method = strcmp(method, "GET") == 0 ? get : other;
                 pesp->state = uri;
             } else {
@@ -80,7 +87,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             break;
         case uri:
             if (cc == ' ') {
-                // printf("uri '%s'\n", ctx_get_reset(pesp));
+                pesp->uri = ctx_str_reset(pesp);
                 pesp->state = http_version;
             } else {
                 ctx_add(pesp, cc);
@@ -88,7 +95,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             break;
         case http_version:
             if (cc == '\n') {
-                // printf("version '%s'\n", ctx_get_reset(pesp));
+                printf("version '%s'\n", ctx_get_reset(pesp));
                 pesp->state = header_key;
             } else {
                 ctx_add(pesp, cc);
@@ -97,7 +104,6 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
         case header_key:
             if (cc == ':') {
                 char *hname = ctx_get_reset(pesp);
-                // printf("header key '%s'\n", hname);
                 if (strcmp("Content-Length", hname) == 0) {
                     pesp->state = content_length_sep;
                 } else {
@@ -118,7 +124,6 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             if (cc == '\n') {
                 char *clength = ctx_get_reset(pesp);
                 pesp->content_length = skip_atoi(&clength);
-                // printf("length body '%d'\n", pesp->content_length);
                 pesp->state = possible_body;
             } else {
                 ctx_add(pesp, cc);
@@ -133,18 +138,11 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             break;
         case header_val:
             if (cc == '\n') {
-                // printf("header val '%s'\n", ctx_get_reset(pesp));
-                char *header_val = ctx_get_reset(pesp);
-                printf("header '%s'\n", header_val);
-//                mp_obj_t alist[2] = {
-//                    pesp->header_key,
-                    pesp->header_val = mp_obj_new_str(header_val, strlen(header_val), true);
-                    pesp->header_kp = mp_obj_new_list(0, NULL);
-                    //mp_obj_list_append(pesp->header_kp, pesp->header_key);
-                    // mp_obj_list_append(pesp->header_kp, pesp->header_val);
-
-//                };
-//                mp_obj_list_append(pesp->headers, 
+                mp_obj_t atuple[2] = {
+                    pesp->header_key,
+                    ctx_str_reset(pesp)
+                };
+                mp_obj_list_append(pesp->headers, mp_obj_new_tuple(2, atuple));
                 pesp->state = possible_body;
             } else {
                 ctx_add(pesp, cc);
@@ -170,11 +168,19 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
         }
     }
     if (pesp->method == get && pesp->state == body_sep) {
-            const char *body = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 18\r\n\r\n"
+        if (pesp->callback) {
+            nlr_buf_t nlr;
+            if (nlr_push(&nlr) == 0) {
+                (void)mp_call_function_1(pesp->callback, pesp);
+            } else {
+                mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+            }
+        }
+        const char *body = "HTTP/2.1 200 OK\r\nConnection: close\r\nContent-Length: 18\r\n\r\n"
                                "{\"result\": \"OK\"}\r\n";
-            printf("GET sending '%s'", body);
+            //printf("GET sending '%s'", body);
             espconn_sent(pesp_conn, (uint8 *)body, (uint16)strlen((const char *)body));
-            printf("done\n");
+            // printf("done\n");
     } else if (pesp->state == body) {
         int size = pesp->ptr - pesp->buffer;
         if (size) {
@@ -206,37 +212,38 @@ static void  ICACHE_FLASH_ATTR webserver_recon(void *arg, sint8 err)
 
 static void ICACHE_FLASH_ATTR webserver_discon(void *arg)
 {
-    struct espconn *pesp_conn = arg;
+//    struct espconn *pesp_conn = arg;
     esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
 
+#if 0
     printf("disconnect | %d.%d.%d.%d:%d \n",
 		   pesp_conn->proto.tcp->remote_ip[0],
 		   pesp_conn->proto.tcp->remote_ip[1],
 		   pesp_conn->proto.tcp->remote_ip[2],
 		   pesp_conn->proto.tcp->remote_ip[3],
 		   pesp_conn->proto.tcp->remote_port);
-
+#endif
     if (pesp->state == body && (pesp->ptr - pesp->buffer)) {
         printf("body '%s'\n", ctx_get_reset(pesp));
     }
-    printf("free context\n");
     ctx_reset(pesp);
-//        ctx_free(pesp->ctx);
+    gc_collect();
 }
 static void ICACHE_FLASH_ATTR socket_sent_callback(void *arg) {
-    printf("sent\n");
+    // printf("sent\n");
 }
 
 static void ICACHE_FLASH_ATTR webserver_listen(void *arg)
 {
     struct espconn *pesp_conn = arg;
+#if 0
     printf("connect    | %d.%d.%d.%d:%d \n",
 		   pesp_conn->proto.tcp->remote_ip[0],
 		   pesp_conn->proto.tcp->remote_ip[1],
 		   pesp_conn->proto.tcp->remote_ip[2],
 		   pesp_conn->proto.tcp->remote_ip[3],
 		   pesp_conn->proto.tcp->remote_port);
-
+#endif
 //    esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
     espconn_regist_recvcb(pesp_conn, webserver_recv);
     espconn_regist_reconcb(pesp_conn, webserver_recon);
@@ -269,7 +276,6 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_ws_make_new(const mp_obj_type_t *type_in, 
     self->len = IBLEN;
     ctx_reset(self);
 	espconn_regist_connectcb(&self->esp_conn, webserver_listen);
-    printf("connect\n");
     return self;
 }
 
@@ -298,9 +304,37 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_test(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_test_obj, mod_esp_ws_test);
 
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_headers(mp_obj_t self_in) {
+    esp_ws_obj_t *self = self_in;
+    return self->headers;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_headers_obj, mod_esp_ws_headers);
+
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_body(mp_obj_t self_in) {
+//    esp_ws_obj_t *self = self_in;
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_body_obj, mod_esp_ws_body);
+
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_uri(mp_obj_t self_in) {
+    esp_ws_obj_t *self = self_in;
+    return self->uri;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_uri_obj, mod_esp_ws_uri);
+
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_method(mp_obj_t self_in) {
+    esp_ws_obj_t *self = self_in;
+    return self->str_method;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_method_obj, mod_esp_ws_method);
+
 STATIC const mp_map_elem_t esp_ws_locals_dict_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR_listen), (mp_obj_t)&mod_esp_ws_listen_obj},
-    {MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_ws_test_obj}
+    {MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_ws_test_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_body), (mp_obj_t)&mod_esp_ws_body_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_headers), (mp_obj_t)&mod_esp_ws_headers_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_uri), (mp_obj_t)&mod_esp_ws_uri_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_method), (mp_obj_t)&mod_esp_ws_method_obj}
 };
 STATIC MP_DEFINE_CONST_DICT(esp_ws_locals_dict, esp_ws_locals_dict_table);
 

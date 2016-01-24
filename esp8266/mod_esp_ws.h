@@ -14,9 +14,11 @@ typedef struct _esp_ws_obj_t {
     int content_length;
     enum { get, other, none}  method;
     mp_obj_t header_key;
-    mp_obj_t header_val;
+   // mp_obj_t header_val;
     mp_obj_t header_kp;
     mp_obj_t headers;
+    mp_obj_t uri;
+    mp_obj_t str_method;
     struct espconn esp_conn;
     esp_tcp esptcp;
     bool accepting;

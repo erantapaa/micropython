@@ -254,3 +254,7 @@ Q(stamode_got_ip)
 // mod_ws
 Q(ws)
 Q(port)
+Q(body)
+Q(headers)
+Q(uri)
+Q(method)

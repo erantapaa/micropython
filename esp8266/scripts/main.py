@@ -1,3 +1,9 @@
 import gc
 import esp
-aa = esp.ws()
+def cb(aws):
+    print("got aws")
+    print(aws.headers())
+    print(aws.uri())
+    print(aws.method())
+
+aa = esp.ws(callback=cb)
