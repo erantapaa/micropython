@@ -3,14 +3,16 @@
 
 typedef struct _esp_ws_obj_t {
     mp_obj_base_t base;
+    // incoming data buffer, current pointer and buffer size
     char *buffer;
     char *ptr;
-    int bp;
     int len;
+    // web server states
     enum {
         method = 0, uri = 1, http_version = 2, header_key = 3,
         header_sep = 4, header_val = 5, content_length_sep = 6, content_length = 7, possible_body = 8, body_sep = 9, body = 10
     } state;
+    // info saved to be sent to the application
     int content_length;
     enum { get, other, none}  method;
     mp_obj_t header_key;
@@ -20,10 +22,15 @@ typedef struct _esp_ws_obj_t {
     mp_obj_t uri;
     mp_obj_t str_method;
     mp_obj_t body;
+    // function called on reception
+    mp_obj_t callback;
+
+    // esp internal state
     struct espconn esp_conn;
     esp_tcp esptcp;
+    //
     bool accepting;
-    mp_obj_t callback;
+    // this holds an allocated block that is passed to 'sent' for the esp runtime to send
     char *to_send;
 } esp_ws_obj_t;
 

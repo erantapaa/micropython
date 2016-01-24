@@ -23,7 +23,7 @@ extern int skip_atoi(char **nptr);
 int ets_sprintf(char *str, const char *format, ...);
 
 
-void ICACHE_FLASH_ATTR ctx_reset(esp_ws_obj_t *ctx) {
+void ICACHE_FLASH_ATTR http_context_reset(esp_ws_obj_t *ctx) {
     ctx->ptr = ctx->buffer;
     ctx->state = method;
     ctx->content_length = 0;
@@ -36,7 +36,7 @@ void ICACHE_FLASH_ATTR ctx_reset(esp_ws_obj_t *ctx) {
 }
 
 
-void  ICACHE_FLASH_ATTR ctx_add(esp_ws_obj_t *ctx, char cc) {
+void  ICACHE_FLASH_ATTR http_context_add_char(esp_ws_obj_t *ctx, char cc) {
     if (ctx->ptr - ctx->buffer > ctx->len) {
         printf("buffer_size overflow\n");
         return;
@@ -44,13 +44,13 @@ void  ICACHE_FLASH_ATTR ctx_add(esp_ws_obj_t *ctx, char cc) {
     *ctx->ptr++ = cc;
 }
 
-char ICACHE_FLASH_ATTR *ctx_get_reset(esp_ws_obj_t *ctx) {
-    ctx_add(ctx, '\0');
+char ICACHE_FLASH_ATTR *http_context_get_and_reset(esp_ws_obj_t *ctx) {
+    http_context_add_char(ctx, '\0');
     ctx->ptr = ctx->buffer;
     return ctx->buffer;
 }
 
-char ICACHE_FLASH_ATTR *ctx_str_reset(esp_ws_obj_t *ctx) {
+char ICACHE_FLASH_ATTR *http_context_mpstr_and_reset(esp_ws_obj_t *ctx) {
     mp_obj_t bp = mp_obj_new_str(ctx->buffer, ctx->ptr - ctx->buffer, true);
     ctx->ptr = ctx->buffer;
     return bp;
@@ -72,7 +72,6 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
     if (reply != mp_const_none) {
         if (!MP_OBJ_IS_TYPE(reply,  &mp_type_str)) {
             nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "ws handler can only return str (or None)"));
-            return;
         }
         mp_str = (mp_obj_str_t *)reply;
     }
@@ -111,34 +110,34 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
         switch (pesp->state) {
         case method:
             if (cc == ' ') {
-                char *method = ctx_get_reset(pesp);
+                char *method = http_context_get_and_reset(pesp);
                 pesp->str_method =  mp_obj_new_str(method, strlen(method), true);
 
                 pesp->method = strcmp(method, "GET") == 0 ? get : other;
                 pesp->state = uri;
             } else {
-                ctx_add(pesp, cc);
+                http_context_add_char(pesp, cc);
             }
             break;
         case uri:
             if (cc == ' ') {
-                pesp->uri = ctx_str_reset(pesp);
+                pesp->uri = http_context_mpstr_and_reset(pesp);
                 pesp->state = http_version;
             } else {
-                ctx_add(pesp, cc);
+                http_context_add_char(pesp, cc);
             }
             break;
         case http_version:
             if (cc == '\n') {
-                (void)ctx_get_reset(pesp);
+                (void)http_context_get_and_reset(pesp);
                 pesp->state = header_key;
             } else {
-                ctx_add(pesp, cc);
+                http_context_add_char(pesp, cc);
             }
             break;
         case header_key:
             if (cc == ':') {
-                char *hname = ctx_get_reset(pesp);
+                char *hname = http_context_get_and_reset(pesp);
                 if (strcmp("Content-Length", hname) == 0) {
                     pesp->state = content_length_sep;
                 } else {
@@ -146,28 +145,28 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
                     pesp->state = header_sep;
                }
             } else {
-                ctx_add(pesp, cc);
+                http_context_add_char(pesp, cc);
             }
             break;
         case content_length_sep:
             if (cc != ' ') {
-                ctx_add(pesp, cc);
+                http_context_add_char(pesp, cc);
                 pesp->state = content_length;
             }
             break;
         case content_length:
             if (cc == '\n') {
-                char *clength = ctx_get_reset(pesp);
+                char *clength = http_context_get_and_reset(pesp);
                 pesp->content_length = skip_atoi(&clength);
                 pesp->state = possible_body;
             } else {
-                ctx_add(pesp, cc);
+                http_context_add_char(pesp, cc);
             }
             break;
 
         case header_sep:
             if (cc != ' ') {
-                ctx_add(pesp, cc);
+                http_context_add_char(pesp, cc);
                 pesp->state = header_val;
             }
             break;
@@ -175,17 +174,17 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             if (cc == '\n') {
                 mp_obj_t atuple[2] = {
                     pesp->header_key,
-                    ctx_str_reset(pesp)
+                    http_context_mpstr_and_reset(pesp)
                 };
                 mp_obj_list_append(pesp->headers, mp_obj_new_tuple(2, atuple));
                 pesp->state = possible_body;
             } else {
-                ctx_add(pesp, cc);
+                http_context_add_char(pesp, cc);
             }
             break;
         case possible_body:
             if (cc != '\n') {
-                ctx_add(pesp, cc);
+                http_context_add_char(pesp, cc);
                 pesp->state = header_key;
             } else {
                 pesp->state = body_sep;
@@ -193,12 +192,12 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             break;
         case body_sep:
             if (cc != '\n') {
-                ctx_add(pesp, cc);
+                http_context_add_char(pesp, cc);
                 pesp->state = body;
             } // else bad state
             break;
         case body:
-            ctx_add(pesp, cc);
+            http_context_add_char(pesp, cc);
             break;
         }
     }
@@ -210,10 +209,10 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
         int size = pesp->ptr - pesp->buffer;
         if (size) {
             if (pesp->content_length == pesp->content_length) {
-                pesp->body = ctx_str_reset(pesp);
+                pesp->body = http_context_mpstr_and_reset(pesp);
                 ws_reply(pesp, pesp_conn);
             } else {
-                ctx_add(pesp, '\0');    // go through this for out by one overflow check
+                http_context_add_char(pesp, '\0');    // go through this for out by one overflow check
                 pesp->ptr--;
                 printf("different body '%s'\n", pesp->buffer);
             }
@@ -236,7 +235,7 @@ static void  ICACHE_FLASH_ATTR webserver_recon(void *arg, sint8 err)
 static void ICACHE_FLASH_ATTR webserver_discon(void *arg)
 {
     esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
-    ctx_reset(pesp);
+    http_context_reset(pesp);
     gc_collect();
 }
 
@@ -278,7 +277,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_ws_make_new(const mp_obj_type_t *type_in, 
     self->accepting = false;
     self->len = vals[2].u_int;
     self->buffer = (char *)m_malloc(self->len);
-    ctx_reset(self);
+    http_context_reset(self);
 	espconn_regist_connectcb(&self->esp_conn, webserver_listen);
     return self;
 }
@@ -287,26 +286,15 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_ws_make_new(const mp_obj_type_t *type_in, 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_listen(mp_obj_t self_in) {
     esp_ws_obj_t *self = self_in;
 
+    if (self->accepting) {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "can only listen once"));
+    }
 	espconn_accept(&self->esp_conn);
     self->accepting = true;
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_listen_obj, mod_esp_ws_listen);
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_test(mp_obj_t self_in) {
-//    esp_ws_obj_t *self = self_in;
-
-    mp_obj_t alist[2] = {
-        mp_obj_new_str("help", 4, false),
-        mp_obj_new_str("crap", 4, false)
-    };
-    mp_obj_t it = mp_obj_new_list(0, NULL);
-    for (int ii = 0; ii < 10; ii++) {
-        mp_obj_list_append(it, mp_obj_new_list(2, alist));
-    }
-    return it;
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_test_obj, mod_esp_ws_test);
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_headers(mp_obj_t self_in) {
     esp_ws_obj_t *self = self_in;
@@ -334,7 +322,6 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_method_obj, mod_esp_ws_method);
 
 STATIC const mp_map_elem_t esp_ws_locals_dict_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR_listen), (mp_obj_t)&mod_esp_ws_listen_obj},
-    {MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&mod_esp_ws_test_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_body), (mp_obj_t)&mod_esp_ws_body_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_headers), (mp_obj_t)&mod_esp_ws_headers_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_uri), (mp_obj_t)&mod_esp_ws_uri_obj},
