@@ -21,6 +21,8 @@
 #define IBLEN 200
 
 extern int skip_atoi(char **nptr);
+int ets_sprintf(char *str, const char *format, ...);
+
 
 void ICACHE_FLASH_ATTR ctx_reset(esp_ws_obj_t *ctx) {
     ctx->ptr = ctx->buffer;
@@ -30,17 +32,10 @@ void ICACHE_FLASH_ATTR ctx_reset(esp_ws_obj_t *ctx) {
     ctx->header_key = mp_const_none;
     ctx->headers = mp_obj_new_list(0, NULL);
     ctx->uri = mp_const_none;
+    ctx->body = mp_const_none;
     ctx->str_method = mp_const_none;
 }
 
-
-#if 0
-void ICACHE_FLASH_ATTR ctx_free(esp_ws_obj_t *ctx) {
-    m_free(ctx->buffer);
-    ctx->buffer = NULL;
-    m_free(ctx);
-}
-#endif
 
 void  ICACHE_FLASH_ATTR ctx_add(esp_ws_obj_t *ctx, char cc) {
     if (ctx->ptr - ctx->buffer > ctx->len) {
@@ -62,6 +57,48 @@ char ICACHE_FLASH_ATTR *ctx_str_reset(esp_ws_obj_t *ctx) {
     return bp;
 }
 
+void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
+    mp_obj_t reply = mp_const_none;
+
+    if (pesp->callback) {
+        nlr_buf_t nlr;
+        if (nlr_push(&nlr) == 0) {
+            reply = mp_call_function_1(pesp->callback, pesp);
+        } else {
+           mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+           return;
+        }
+    }
+    mp_obj_str_t *mp_str = (mp_obj_str_t *)reply;
+    if (reply != mp_const_none) {
+        if (!MP_OBJ_IS_TYPE(reply,  &mp_type_str)) {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "ws handler can only return str (or None)"));
+            return;
+        }
+        mp_str = (mp_obj_str_t *)reply;
+    }
+    const char *body_base = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: ";
+    int body_base_size = strlen(body_base);
+
+    int  body_size = reply == mp_const_none ? 0 : mp_str->len;
+
+    char body_size_str[20];
+    ets_sprintf(body_size_str, "%d\r\n\r\n", body_size);
+    int body_size_str_len = strlen(body_size_str);
+
+    int total_len = body_base_size + body_size_str_len + body_size;
+
+    pesp->to_send = (char *)m_malloc(total_len);
+
+    strcpy(pesp->to_send, body_base);
+    strcpy(pesp->to_send + body_base_size, body_size_str);
+    if (body_size) {
+        strcpy(pesp->to_send + body_base_size + body_size_str_len, (char *)mp_str->data); // todo, mp_str data may not be null terminated
+    }
+//    printf("sending '%s'\n", total_reply);
+    espconn_sent(pesp_conn, (uint8 *)pesp->to_send, (uint16)total_len);
+
+}
 
 static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigned short length) {
     struct espconn *pesp_conn = arg;
@@ -95,7 +132,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             break;
         case http_version:
             if (cc == '\n') {
-                printf("version '%s'\n", ctx_get_reset(pesp));
+                (void)ctx_get_reset(pesp);
                 pesp->state = header_key;
             } else {
                 ctx_add(pesp, cc);
@@ -167,20 +204,10 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             break;
         }
     }
+
+
     if (pesp->method == get && pesp->state == body_sep) {
-        if (pesp->callback) {
-            nlr_buf_t nlr;
-            if (nlr_push(&nlr) == 0) {
-                (void)mp_call_function_1(pesp->callback, pesp);
-            } else {
-                mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
-            }
-        }
-        const char *body = "HTTP/2.1 200 OK\r\nConnection: close\r\nContent-Length: 18\r\n\r\n"
-                               "{\"result\": \"OK\"}\r\n";
-            //printf("GET sending '%s'", body);
-            espconn_sent(pesp_conn, (uint8 *)body, (uint16)strlen((const char *)body));
-            // printf("done\n");
+        ws_reply(pesp, pesp_conn);
     } else if (pesp->state == body) {
         int size = pesp->ptr - pesp->buffer;
         if (size) {
@@ -230,7 +257,8 @@ static void ICACHE_FLASH_ATTR webserver_discon(void *arg)
     gc_collect();
 }
 static void ICACHE_FLASH_ATTR socket_sent_callback(void *arg) {
-    // printf("sent\n");
+    esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
+    m_free(pesp->to_send);
 }
 
 static void ICACHE_FLASH_ATTR webserver_listen(void *arg)

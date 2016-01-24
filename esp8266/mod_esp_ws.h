@@ -19,10 +19,12 @@ typedef struct _esp_ws_obj_t {
     mp_obj_t headers;
     mp_obj_t uri;
     mp_obj_t str_method;
+    mp_obj_t body;
     struct espconn esp_conn;
     esp_tcp esptcp;
     bool accepting;
     mp_obj_t callback;
+    char *to_send;
 } esp_ws_obj_t;
 
 extern const mp_obj_type_t esp_ws_type;
