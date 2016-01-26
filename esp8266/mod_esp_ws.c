@@ -12,7 +12,6 @@
 #include "mem.h"
 #include "osapi.h"
 #include "user_interface.h"
-
 #include "espconn.h"
 
 #include "gccollect.h"
@@ -59,6 +58,29 @@ char ICACHE_FLASH_ATTR *http_context_mpstr_and_reset(esp_ws_obj_t *ctx) {
     return bp;
 }
 
+void ICACHE_FLASH_ATTR esp_ws_send(esp_ws_obj_t *pesp, mp_obj_str_t *mp_str) {
+
+    const char *body_base = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: ";
+    int body_base_size = strlen(body_base);
+
+    int  body_size = mp_str == mp_const_none ? 0 : mp_str->len;
+
+    char body_size_str[20];
+    ets_sprintf(body_size_str, "%d\r\n\r\n", body_size);
+    int body_size_str_len = strlen(body_size_str);
+
+    pesp->to_send_len = body_base_size + body_size_str_len + body_size;
+    pesp->to_send = (char *)m_malloc(pesp->to_send_len + 1);    // plus 1 for a null when using strcpy below
+
+    strcpy(pesp->to_send, body_base);
+    strcpy(pesp->to_send + body_base_size, body_size_str);
+    if (body_size) {
+        strcpy(pesp->to_send + body_base_size + body_size_str_len, (char *)mp_str->data); // todo, mp_str data may not be null terminated
+    }
+
+    espconn_sent(&pesp->esp_conn, (uint8 *)pesp->to_send, (uint16)pesp->to_send_len);
+}
+
 void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
     mp_obj_t client_reply = mp_const_none;
 
@@ -77,25 +99,7 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
                 nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "ws handler can only return str (or None)"));
             }
         }
-        mp_obj_str_t *mp_str = (mp_obj_str_t *)client_reply;
-        const char *body_base = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: ";
-        int body_base_size = strlen(body_base);
-
-        int  body_size = mp_str == mp_const_none ? 0 : mp_str->len;
-
-        char body_size_str[20];
-        ets_sprintf(body_size_str, "%d\r\n\r\n", body_size);
-        int body_size_str_len = strlen(body_size_str);
-        pesp->to_send_len = body_base_size + body_size_str_len + body_size;
-
-        pesp->to_send = (char *)m_malloc(pesp->to_send_len + 1);    // plus 1 for a null when using strcpy below
-
-        strcpy(pesp->to_send, body_base);
-        strcpy(pesp->to_send + body_base_size, body_size_str);
-        if (body_size) {
-            strcpy(pesp->to_send + body_base_size + body_size_str_len, (char *)mp_str->data); // todo, mp_str data may not be null terminated
-        }
-        espconn_sent(pesp_conn, (uint8 *)pesp->to_send, (uint16)pesp->to_send_len);
+        esp_ws_send(pesp, (mp_obj_str_t *)client_reply);
     }
 }
 
