@@ -253,9 +253,11 @@ Q(stamode_got_ip)
 
 // mod_ws
 Q(ws)
-Q(port)
+Q(local_port)
+Q(remote)
 Q(body)
 Q(headers)
 Q(uri)
 Q(method)
 Q(buffer_size)
+Q(async_send)

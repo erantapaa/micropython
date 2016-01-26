@@ -5,6 +5,7 @@
 #include "../py/obj.h"
 #include "../py/objstr.h"
 #include "../py/misc.h"
+#include "netutils.h"
 
 #include "ets_sys.h"
 #include "os_type.h"
@@ -25,7 +26,7 @@ int ets_sprintf(char *str, const char *format, ...);
 
 void ICACHE_FLASH_ATTR http_context_reset(esp_ws_obj_t *ctx) {
     ctx->ptr = ctx->buffer;
-    ctx->state = method;
+    ctx->state = method_or_reply_http;
     ctx->content_length = 0;
     ctx->method = none;
     ctx->header_key = mp_const_none;
@@ -33,6 +34,8 @@ void ICACHE_FLASH_ATTR http_context_reset(esp_ws_obj_t *ctx) {
     ctx->uri = mp_const_none;
     ctx->body = mp_const_none;
     ctx->str_method = mp_const_none;
+    ctx->to_send = NULL;
+    ctx->to_send_len = 0;
 }
 
 
@@ -57,44 +60,43 @@ char ICACHE_FLASH_ATTR *http_context_mpstr_and_reset(esp_ws_obj_t *ctx) {
 }
 
 void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
-    mp_obj_t reply = mp_const_none;
+    mp_obj_t client_reply = mp_const_none;
 
     if (pesp->callback) {
         nlr_buf_t nlr;
         if (nlr_push(&nlr) == 0) {
-            reply = mp_call_function_1(pesp->callback, pesp);
+            client_reply = mp_call_function_1(pesp->callback, pesp);
         } else {
            mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
            return;
         }
     }
-    mp_obj_str_t *mp_str = (mp_obj_str_t *)reply;
-    if (reply != mp_const_none) {
-        if (!MP_OBJ_IS_TYPE(reply,  &mp_type_str)) {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "ws handler can only return str (or None)"));
+    if (pesp->method != reply) {
+        if (client_reply != mp_const_none) {
+            if (!MP_OBJ_IS_TYPE(client_reply,  &mp_type_str)) {
+                nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "ws handler can only return str (or None)"));
+            }
         }
-        mp_str = (mp_obj_str_t *)reply;
+        mp_obj_str_t *mp_str = (mp_obj_str_t *)client_reply;
+        const char *body_base = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: ";
+        int body_base_size = strlen(body_base);
+
+        int  body_size = mp_str == mp_const_none ? 0 : mp_str->len;
+
+        char body_size_str[20];
+        ets_sprintf(body_size_str, "%d\r\n\r\n", body_size);
+        int body_size_str_len = strlen(body_size_str);
+        pesp->to_send_len = body_base_size + body_size_str_len + body_size;
+
+        pesp->to_send = (char *)m_malloc(pesp->to_send_len + 1);    // plus 1 for a null when using strcpy below
+
+        strcpy(pesp->to_send, body_base);
+        strcpy(pesp->to_send + body_base_size, body_size_str);
+        if (body_size) {
+            strcpy(pesp->to_send + body_base_size + body_size_str_len, (char *)mp_str->data); // todo, mp_str data may not be null terminated
+        }
+        espconn_sent(pesp_conn, (uint8 *)pesp->to_send, (uint16)pesp->to_send_len);
     }
-    const char *body_base = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: ";
-    int body_base_size = strlen(body_base);
-
-    int  body_size = reply == mp_const_none ? 0 : mp_str->len;
-
-    char body_size_str[20];
-    ets_sprintf(body_size_str, "%d\r\n\r\n", body_size);
-    int body_size_str_len = strlen(body_size_str);
-    int total_len = body_base_size + body_size_str_len + body_size;
-
-    pesp->to_send = (char *)m_malloc(total_len);
-
-    strcpy(pesp->to_send, body_base);
-    strcpy(pesp->to_send + body_base_size, body_size_str);
-    if (body_size) {
-        strcpy(pesp->to_send + body_base_size + body_size_str_len, (char *)mp_str->data); // todo, mp_str data may not be null terminated
-    }
-//    printf("sending '%s'\n", total_reply);
-    espconn_sent(pesp_conn, (uint8 *)pesp->to_send, (uint16)total_len);
-
 }
 
 static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigned short length) {
@@ -108,13 +110,25 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             continue;
         }
         switch (pesp->state) {
-        case method:
+        case method_or_reply_http:
             if (cc == ' ') {
                 char *method = http_context_get_and_reset(pesp);
-                pesp->str_method =  mp_obj_new_str(method, strlen(method), true);
-
-                pesp->method = strcmp(method, "GET") == 0 ? get : other;
-                pesp->state = uri;
+                if (strncmp(method, "HTTP/", 5) == 0) {
+                    pesp->state = status_code;
+                    pesp->method = reply;
+                } else {
+                    pesp->str_method = mp_obj_new_str(method, strlen(method), true);
+                    pesp->method = strcmp(method, "GET") == 0 ? get : other;
+                    pesp->state = uri;
+                }
+            } else {
+                http_context_add_char(pesp, cc);
+            }
+            break;
+        case status_code:
+            if (cc == '\n') {
+                pesp->str_status = http_context_mpstr_and_reset(pesp);
+                pesp->state = header_key;
             } else {
                 http_context_add_char(pesp, cc);
             }
@@ -203,7 +217,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
     }
 
 
-    if (pesp->method == get && pesp->state == body_sep) {
+    if (pesp->method == get && pesp->state == body_sep) {       // if a GET then no body
         ws_reply(pesp, pesp_conn);
     } else if (pesp->state == body) {
         int size = pesp->ptr - pesp->buffer;
@@ -216,6 +230,9 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
                 pesp->ptr--;
                 printf("different body '%s'\n", pesp->buffer);
             }
+        } else {
+            printf("have not got body and no size (all consume) check content length\n");
+                printf("got body and ength matched");
         }
     }
     return;
@@ -241,23 +258,30 @@ static void ICACHE_FLASH_ATTR webserver_discon(void *arg)
 
 static void ICACHE_FLASH_ATTR socket_sent_callback(void *arg) {
     esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
-    m_free(pesp->to_send);
+    if (pesp->to_send != NULL) {
+        m_free(pesp->to_send);
+    }
+    pesp->to_send = NULL;
+    pesp->to_send_len = 0;
 }
 
-static void ICACHE_FLASH_ATTR webserver_listen(void *arg)
+static void ICACHE_FLASH_ATTR connected(void *arg)
 {
-    struct espconn *pesp_conn = arg;
-    espconn_regist_recvcb(pesp_conn, webserver_recv);
-    espconn_regist_reconcb(pesp_conn, webserver_recon);
-    espconn_regist_disconcb(pesp_conn, webserver_discon);
-    espconn_regist_sentcb(pesp_conn, socket_sent_callback);
-
+    esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
+    if (pesp->to_send) {
+        int rval;
+        if ((rval = espconn_sent(&pesp->esp_conn, (uint8 *)pesp->to_send, (uint16)pesp->to_send_len)) != 0) {
+            printf("error in sent rval %d\n", rval);
+        }
+    }
 }
 
 STATIC const mp_arg_t esp_ws_init_args[] = {
     { MP_QSTR_callback, MP_ARG_OBJ, {.u_obj = mp_const_none}},
-    { MP_QSTR_port, MP_ARG_INT, {.u_int = 80}},
+    { MP_QSTR_local_port, MP_ARG_INT, {.u_int = 0}},
+    { MP_QSTR_remote, MP_ARG_OBJ, {.u_obj = mp_const_none}},
     { MP_QSTR_buffer_size, MP_ARG_INT, {.u_int = 200}}
+
 };
 #define ESP_WS_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_ws_init_args)
 
@@ -271,14 +295,33 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_ws_make_new(const mp_obj_type_t *type_in, 
     self->callback = vals[0].u_obj;
 	self->esp_conn.type = ESPCONN_TCP;
 	self->esp_conn.state = ESPCONN_NONE;
+
 	self->esp_conn.proto.tcp = &self->esptcp;
-	self->esp_conn.proto.tcp->local_port = vals[1].u_int;
+
+    if (vals[2].u_obj == mp_const_none && vals[1].u_int == 0) {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "local_port or remote"));
+    }
+
+    if (vals[2].u_obj != mp_const_none) { // remote, put address in second argument and return port
+        self->esp_conn.proto.tcp->remote_port =
+            netutils_parse_inet_addr(vals[2].u_obj, self->esp_conn.proto.tcp->remote_ip,
+            NETUTILS_BIG);
+        printf("port %d\n", self->esp_conn.proto.tcp->remote_port);
+    }
+    if (vals[1].u_int != 0) {
+        self->esp_conn.proto.tcp->local_port = vals[1].u_int;
+    }
+
     self->esp_conn.reverse = self;
     self->accepting = false;
-    self->len = vals[2].u_int;
+    self->len = vals[3].u_int;
     self->buffer = (char *)m_malloc(self->len);
     http_context_reset(self);
-	espconn_regist_connectcb(&self->esp_conn, webserver_listen);
+	espconn_regist_connectcb(&self->esp_conn, connected);
+    espconn_regist_recvcb(&self->esp_conn, webserver_recv);   // TODO: move to initialiser
+    espconn_regist_reconcb(&self->esp_conn, webserver_recon);
+    espconn_regist_disconcb(&self->esp_conn, webserver_discon);
+    espconn_regist_sentcb(&self->esp_conn, socket_sent_callback);
     return self;
 }
 
@@ -294,6 +337,20 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_listen(mp_obj_t self_in) {
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_listen_obj, mod_esp_ws_listen);
+
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_async_send(mp_obj_t self_in, mp_obj_t buf_in) {
+    esp_ws_obj_t *self = self_in;
+    char *what = "GET / HTTP/1.0\r\n\r\n";
+    int what_len = strlen(what);
+    self->to_send = (char *)m_malloc(what_len);
+    self->to_send_len = what_len;
+    memcpy(self->to_send, what, what_len);
+    int rval = espconn_connect(&self->esp_conn);
+    printf("connect rval is %d\n", rval);
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_esp_ws_async_send_obj, mod_esp_ws_async_send);
+
 
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_headers(mp_obj_t self_in) {
@@ -325,7 +382,8 @@ STATIC const mp_map_elem_t esp_ws_locals_dict_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR_body), (mp_obj_t)&mod_esp_ws_body_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_headers), (mp_obj_t)&mod_esp_ws_headers_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_uri), (mp_obj_t)&mod_esp_ws_uri_obj},
-    {MP_OBJ_NEW_QSTR(MP_QSTR_method), (mp_obj_t)&mod_esp_ws_method_obj}
+    {MP_OBJ_NEW_QSTR(MP_QSTR_method), (mp_obj_t)&mod_esp_ws_method_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_async_send), (mp_obj_t)&mod_esp_ws_async_send_obj}
 };
 STATIC MP_DEFINE_CONST_DICT(esp_ws_locals_dict, esp_ws_locals_dict_table);
 
