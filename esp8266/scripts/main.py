@@ -22,4 +22,5 @@ def cb(aws):
 
 # aa = "aa = esp.ws(callback=cb)"
 #aa.listen()
-aa = esp.ws(callback=cb, remote=('131.84.1.118', 8000))
+#aa = esp.ws(callback=cb, remote=('131.84.1.118', 8000))
+aa = "aa = esp.ws(callback=cb, remote=('131.84.1.118', 8000), headers=[('a', 'b')])"

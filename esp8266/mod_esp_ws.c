@@ -280,11 +280,36 @@ static void ICACHE_FLASH_ATTR connected(void *arg)
     }
 }
 
+STATIC ICACHE_FLASH_ATTR uint16_t hdr_len(mp_obj_t obj_in) {
+    uint16_t len = 0;
+
+    if (!MP_OBJ_IS_TYPE(obj_in,  &mp_type_list)) {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "headers are a list"));
+    }
+    mp_obj_list_t *al = (mp_obj_list_t *)obj_in;
+    for (int ii = 0; ii < al->len; ii++) {
+        if (!MP_OBJ_IS_TYPE(al->items[ii], &mp_type_tuple)) {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "header items not tuples"));
+        } 
+        mp_obj_tuple_t *tp = al->items[ii];
+        if (tp->len != 2) {
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "header inner tuple must be len 2"));
+        }
+        mp_buffer_info_t bufinfo;
+        mp_get_buffer_raise(tp->items[0], &bufinfo, MP_BUFFER_READ);
+        len += bufinfo.len + 2;  // blah + ':  '
+        mp_get_buffer_raise(tp->items[1], &bufinfo, MP_BUFFER_READ);
+        len += bufinfo.len + 2;  // blah + '\r\n'
+    }
+    return len;
+}
+
 STATIC const mp_arg_t esp_ws_init_args[] = {
     { MP_QSTR_callback, MP_ARG_OBJ, {.u_obj = mp_const_none}},
     { MP_QSTR_local_port, MP_ARG_INT, {.u_int = 0}},
     { MP_QSTR_remote, MP_ARG_OBJ, {.u_obj = mp_const_none}},
-    { MP_QSTR_buffer_size, MP_ARG_INT, {.u_int = 200}}
+    { MP_QSTR_buffer_size, MP_ARG_INT, {.u_int = 200}},
+    { MP_QSTR_headers, MP_ARG_OBJ, {.u_obj = mp_const_none}}
 
 };
 #define ESP_WS_INIT_NUM_ARGS MP_ARRAY_SIZE(esp_ws_init_args)
@@ -313,6 +338,19 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_ws_make_new(const mp_obj_type_t *type_in, 
     }
     if (vals[1].u_int != 0) {
         self->esp_conn.proto.tcp->local_port = vals[1].u_int;
+    }
+
+    if (vals[4].u_obj != mp_const_none) {
+        if (!MP_OBJ_IS_TYPE(vals[4].u_obj,  &mp_type_list)) {
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "headers are a list"));
+        }
+        mp_obj_list_t *al = (mp_obj_list_t *)vals[4].u_obj;
+        if (!MP_OBJ_IS_TYPE(al->items[0], &mp_type_tuple)) {
+            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "header items not tuples"));
+        } 
+        // TODO: validate they are strings in the tuples
+        printf("outgoing header len %d\n", hdr_len(vals[4].u_obj));
+        self->outgoing_headers = vals[4].u_obj;     // TODO: use the al as a list and store of keep as mp_obj?
     }
 
     self->esp_conn.reverse = self;

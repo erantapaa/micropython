@@ -34,6 +34,8 @@ typedef struct _esp_ws_obj_t {
     // this holds an allocated block that is passed to 'sent' for the esp runtime to send
     char *to_send;
     int to_send_len;
+    // extra outgoing headers
+    mp_obj_t outgoing_headers;
 } esp_ws_obj_t;
 
 extern const mp_obj_type_t esp_ws_type;
