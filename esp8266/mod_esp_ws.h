@@ -35,7 +35,9 @@ typedef struct _esp_ws_obj_t {
     char *to_send;
     int to_send_len;
     // extra outgoing headers
+    char *outgoing_headers_str;
     mp_obj_t outgoing_headers;
+    int outgoing_headers_len;
 } esp_ws_obj_t;
 
 extern const mp_obj_type_t esp_ws_type;

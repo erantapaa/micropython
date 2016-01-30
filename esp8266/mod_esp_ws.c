@@ -72,9 +72,15 @@ void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_str_t *m
         memcpy(pesp->to_send + body_base_size, body_size_str, body_size_str_len);
         memcpy(pesp->to_send + body_base_size + body_size_str_len, (char *)mp_str->data, mp_str->len);
     } else {
-        pesp->to_send_len = body_base_size;
+        pesp->to_send_len = body_base_size + pesp->outgoing_headers_len + 2;  // + extra \r\n
         pesp->to_send = (char *)m_malloc(pesp->to_send_len);
         memcpy(pesp->to_send, body_base, body_base_size);
+        if (pesp->outgoing_headers_len) {
+            memcpy(pesp->to_send + body_base_size, pesp->outgoing_headers_str, pesp->outgoing_headers_len);
+        }
+        memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len, "\r\n", 2);
+        printf("out '%.*s'", pesp->outgoing_headers_len, pesp->outgoing_headers_str);
+        printf("send %.*s", body_base_size + pesp->outgoing_headers_len + 2, pesp->to_send);
     }
 }
 
@@ -280,7 +286,7 @@ static void ICACHE_FLASH_ATTR connected(void *arg)
     }
 }
 
-STATIC ICACHE_FLASH_ATTR uint16_t hdr_len(mp_obj_t obj_in) {
+STATIC ICACHE_FLASH_ATTR uint16_t hdr_len(mp_obj_t obj_in, char *target) {
     uint16_t len = 0;
 
     if (!MP_OBJ_IS_TYPE(obj_in,  &mp_type_list)) {
@@ -297,8 +303,16 @@ STATIC ICACHE_FLASH_ATTR uint16_t hdr_len(mp_obj_t obj_in) {
         }
         mp_buffer_info_t bufinfo;
         mp_get_buffer_raise(tp->items[0], &bufinfo, MP_BUFFER_READ);
+        if (target != NULL) {
+            memcpy(target + len, bufinfo.buf, bufinfo.len);
+            memcpy(target + len + bufinfo.len, ": ", 2);
+        }
         len += bufinfo.len + 2;  // blah + ':  '
         mp_get_buffer_raise(tp->items[1], &bufinfo, MP_BUFFER_READ);
+        if (target != NULL) {
+            memcpy(target + len, bufinfo.buf, bufinfo.len);
+            memcpy(target + len + bufinfo.len, "\r\n", 2);
+        }
         len += bufinfo.len + 2;  // blah + '\r\n'
     }
     return len;
@@ -341,16 +355,14 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_ws_make_new(const mp_obj_type_t *type_in, 
     }
 
     if (vals[4].u_obj != mp_const_none) {
-        if (!MP_OBJ_IS_TYPE(vals[4].u_obj,  &mp_type_list)) {
-            nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "headers are a list"));
-        }
-        mp_obj_list_t *al = (mp_obj_list_t *)vals[4].u_obj;
-        if (!MP_OBJ_IS_TYPE(al->items[0], &mp_type_tuple)) {
-            nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "header items not tuples"));
-        } 
-        // TODO: validate they are strings in the tuples
-        printf("outgoing header len %d\n", hdr_len(vals[4].u_obj));
-        self->outgoing_headers = vals[4].u_obj;     // TODO: use the al as a list and store of keep as mp_obj?
+        self->outgoing_headers_len = hdr_len(vals[4].u_obj, NULL);
+        self->outgoing_headers_str = (char *)m_malloc(self->outgoing_headers_len);
+        hdr_len(vals[4].u_obj, self->outgoing_headers_str);
+        self->outgoing_headers = vals[4].u_obj;
+    } else {
+        self->outgoing_headers_len = 0;
+        self->outgoing_headers = mp_const_none;
+        self->outgoing_headers_str = NULL;
     }
 
     self->esp_conn.reverse = self;
@@ -359,7 +371,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_ws_make_new(const mp_obj_type_t *type_in, 
     self->buffer = (char *)m_malloc(self->len);
     http_context_reset(self);
 	espconn_regist_connectcb(&self->esp_conn, connected);
-    espconn_regist_recvcb(&self->esp_conn, webserver_recv);   // TODO: move to initialiser
+    espconn_regist_recvcb(&self->esp_conn, webserver_recv);
     espconn_regist_reconcb(&self->esp_conn, webserver_recon);
     espconn_regist_disconcb(&self->esp_conn, webserver_discon);
     espconn_regist_sentcb(&self->esp_conn, socket_sent_callback);
@@ -382,7 +394,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_listen_obj, mod_esp_ws_listen);
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_async_send(mp_obj_t self_in, mp_obj_t buf_in) {
     esp_ws_obj_t *self = self_in;
 
-    const char *body_base = "GET / HTTP/1.0\r\n\r\n";
+    const char *body_base = "GET / HTTP/1.0\r\n";
     uint16_t body_base_size = strlen(body_base);
     esp_make_http_to_send(self, mp_const_none, body_base, body_base_size);
 
@@ -418,13 +430,21 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_method(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_method_obj, mod_esp_ws_method);
 
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_status(mp_obj_t self_in) {
+    esp_ws_obj_t *self = self_in;
+    return self->str_status;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_status_obj, mod_esp_ws_status);
+
 STATIC const mp_map_elem_t esp_ws_locals_dict_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR_listen), (mp_obj_t)&mod_esp_ws_listen_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_async_send), (mp_obj_t)&mod_esp_ws_async_send_obj},
+    // the following could go into a dictionary like the uwsi environ, then I can use 'body' in blah
     {MP_OBJ_NEW_QSTR(MP_QSTR_body), (mp_obj_t)&mod_esp_ws_body_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_headers), (mp_obj_t)&mod_esp_ws_headers_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_uri), (mp_obj_t)&mod_esp_ws_uri_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_method), (mp_obj_t)&mod_esp_ws_method_obj},
-    {MP_OBJ_NEW_QSTR(MP_QSTR_async_send), (mp_obj_t)&mod_esp_ws_async_send_obj}
+    {MP_OBJ_NEW_QSTR(MP_QSTR_status), (mp_obj_t)&mod_esp_ws_status_obj}
 };
 STATIC MP_DEFINE_CONST_DICT(esp_ws_locals_dict, esp_ws_locals_dict_table);
 
