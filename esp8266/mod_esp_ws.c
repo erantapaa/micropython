@@ -35,6 +35,7 @@ void ICACHE_FLASH_ATTR http_context_reset(esp_ws_obj_t *ctx) {
     ctx->str_method = mp_const_none;
     ctx->to_send = NULL;
     ctx->to_send_len = 0;
+    ctx->str_status = mp_const_none;
 }
 
 
@@ -62,15 +63,21 @@ void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_str_t *m
     int  body_size = mp_str == mp_const_none ? 0 : mp_str->len;
 
     if (body_size) {
-        const char *bls = "Content-Length%d\r\n\r\n";
+        const char *bls = "Content-Length: %d\r\n";
         char body_size_str[strlen(bls) + 10];
         ets_sprintf(body_size_str, bls, mp_str->len);
         int body_size_str_len = strlen(body_size_str);
-        pesp->to_send_len = body_base_size + body_size_str_len + mp_str->len;
+
+        pesp->to_send_len = body_base_size + pesp->outgoing_headers_len + body_size_str_len + 2 + mp_str->len;
         pesp->to_send = (char *)m_malloc(pesp->to_send_len);
+
         memcpy(pesp->to_send, body_base, body_base_size);
-        memcpy(pesp->to_send + body_base_size, body_size_str, body_size_str_len);
-        memcpy(pesp->to_send + body_base_size + body_size_str_len, (char *)mp_str->data, mp_str->len);
+        if (pesp->outgoing_headers_len) {
+            memcpy(pesp->to_send + body_base_size, pesp->outgoing_headers_str, pesp->outgoing_headers_len);
+        }
+        memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len, body_size_str, body_size_str_len);
+        memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len + body_size_str_len, "\r\n", 2);
+        memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len + body_size_str_len + 2, (char *)mp_str->data, mp_str->len);
     } else {
         pesp->to_send_len = body_base_size + pesp->outgoing_headers_len + 2;  // + extra \r\n
         pesp->to_send = (char *)m_malloc(pesp->to_send_len);
@@ -79,9 +86,9 @@ void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_str_t *m
             memcpy(pesp->to_send + body_base_size, pesp->outgoing_headers_str, pesp->outgoing_headers_len);
         }
         memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len, "\r\n", 2);
-        printf("out '%.*s'", pesp->outgoing_headers_len, pesp->outgoing_headers_str);
-        printf("send %.*s", body_base_size + pesp->outgoing_headers_len + 2, pesp->to_send);
     }
+    //printf("send %.*s", pesp->to_send_len, pesp->to_send);
+
 }
 
 void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
@@ -93,7 +100,6 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
             client_reply = mp_call_function_1(pesp->callback, pesp);
         } else {
            mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
-           return;
         }
     }
     if (pesp->method != reply) {
@@ -391,19 +397,20 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_listen(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_listen_obj, mod_esp_ws_listen);
 
+// send method GET, POST, default 'GET', URL, default '/', body, default none
+
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_async_send(mp_obj_t self_in, mp_obj_t buf_in) {
     esp_ws_obj_t *self = self_in;
 
-    const char *body_base = "GET / HTTP/1.0\r\n";
+    const char *body_base = "GET / HTTP/1.1\r\n";
     uint16_t body_base_size = strlen(body_base);
     esp_make_http_to_send(self, mp_const_none, body_base, body_base_size);
 
-    int rval = espconn_connect(&self->esp_conn);
-    printf("connect rval is %d\n", rval);
+    // TODO: manage this return value (and similarly others
+    espconn_connect(&self->esp_conn);
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_esp_ws_async_send_obj, mod_esp_ws_async_send);
-
 
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_headers(mp_obj_t self_in) {

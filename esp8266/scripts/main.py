@@ -24,8 +24,11 @@ def cb(aws):
     last = js
     return '{"status": %d}' % counter
 
-# aa = "aa = esp.ws(callback=cb)"
-#aa.listen()
-aa = esp.ws(callback=cb, remote=('131.84.1.118', 8000), headers=[('Content-type', 'application/json')])
 
-#aa = "aa = esp.ws(callback=cb, remote=('131.84.1.118', 8000), headers=[('a', 'b')])"
+def run():
+    aa = esp.ws(callback=cb, local_port=80, headers=[('Content-type', 'application/json')])
+    aa.listen()
+    return aa
+aa = "aa = run()"
+#aa = esp.ws(callback=cb, remote=('131.84.1.118', 8000), headers=[('Content-type', 'application/json')])
+#cc = esp.ws(callback=cb, remote=('131.84.1.212', 80), headers=[('Content-type', 'application/json')])
