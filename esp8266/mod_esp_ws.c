@@ -102,16 +102,47 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
            mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
         }
     }
+
+    // if string use data as body
+    // if tuple use first as body, second as reply code
+    // if nothing return 200 OK
     if (pesp->method != reply) {
+        const char *status = "200 OK";
+        uint16_t status_len = strlen(status);
+        mp_buffer_info_t bufinfo;
         if (client_reply != mp_const_none) {
-            if (!MP_OBJ_IS_TYPE(client_reply,  &mp_type_str)) {
-                nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError, "ws handler can only return str (or None)"));
-            }
+            if (MP_OBJ_IS_TYPE(client_reply, &mp_type_tuple)) {
+                mp_obj_tuple_t *tp = client_reply;
+                if (tp->len != 2) {
+                    nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "view reply must be tuple of 2"));
+                } else {
+                    client_reply = tp->items[0];
+                    mp_get_buffer_raise(tp->items[1], &bufinfo, MP_BUFFER_READ);
+                    status = bufinfo.buf;
+                    status_len = bufinfo.len;
+                }
+            } else if (!MP_OBJ_IS_TYPE(client_reply,  &mp_type_str)) {
+                nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "view must return tuple or str"));
+            } 
         }
-        const char *body_base = "HTTP/1.1 200 OK\r\nConnection: close\r\n";
-        uint16_t body_base_size = strlen(body_base);
+        
+        const char *body_version = "HTTP/1.1 ";
+        const char *body_con_close = "Connection: close\r\n";
+        uint16_t body_base_size = strlen(body_version) + status_len + 2 + strlen(body_con_close); // 2 for \r\n
+        char *body_base = (char *)m_malloc(body_base_size + 1); // adding 1 for a null to debug
+        char *bp = body_base;
+        memcpy(bp, body_version, strlen(body_version));
+        bp += strlen(body_version);
+        memcpy(bp, status, status_len);
+        bp += status_len;
+        memcpy(bp, "\r\n", 2);
+        bp += 2;
+        memcpy(bp, body_con_close, strlen(body_con_close));
+        bp += strlen(body_con_close);
+        *bp = '\0';
         esp_make_http_to_send(pesp, (mp_obj_str_t *)client_reply, body_base, body_base_size);
         espconn_sent(&pesp->esp_conn, (uint8 *)pesp->to_send, (uint16)pesp->to_send_len);
+        m_free(body_base);
     }
 }
 
@@ -248,7 +279,6 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             }
         } else {
             printf("have not got body and no size (all consume) check content length\n");
-                printf("got body and ength matched");
         }
     }
     return;

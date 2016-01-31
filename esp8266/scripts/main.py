@@ -9,8 +9,7 @@ lastaws = None
 def cb(aws):
     global counter, last, lastaws
     counter = counter + 1
-    print("got aws %r" % counter)
-    print("headers", aws.headers())
+    # print("headers", aws.headers())
     if aws.path():
         print("SRV from post URI", aws.path())
     if aws.method():
@@ -18,11 +17,13 @@ def cb(aws):
     if aws.status():
         print("CLI reply from get, status", aws.status())
     lastaws = aws
-    print("body '%s'" % aws.body())
     js = ujson.loads(aws.body())
     print("%d res %s" % (counter, str(js)))
     last = js
-    return '{"status": %d}' % counter
+    if 'test' in js and js['test'] == 1:
+        return None, "401 Bad"
+    else:
+        return '{"status": %d}' % counter
 
 
 def run():
