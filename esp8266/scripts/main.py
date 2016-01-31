@@ -11,8 +11,8 @@ def cb(aws):
     counter = counter + 1
     print("got aws %r" % counter)
     print("headers", aws.headers())
-    if aws.uri():
-        print("SRV from post URI", aws.uri())
+    if aws.path():
+        print("SRV from post URI", aws.path())
     if aws.method():
         print("SRV method", aws.method())
     if aws.status():
@@ -29,6 +29,6 @@ def run():
     aa = esp.ws(callback=cb, local_port=80, headers=[('Content-type', 'application/json')])
     aa.listen()
     return aa
-aa = "aa = run()"
-#aa = esp.ws(callback=cb, remote=('131.84.1.118', 8000), headers=[('Content-type', 'application/json')])
+bb = "aa = run()"
+aa = esp.ws(callback=cb, remote=('131.84.1.118', 8000), headers=[('Content-type', 'application/json')])
 #cc = esp.ws(callback=cb, remote=('131.84.1.212', 80), headers=[('Content-type', 'application/json')])

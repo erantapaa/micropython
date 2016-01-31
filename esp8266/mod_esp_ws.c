@@ -30,7 +30,7 @@ void ICACHE_FLASH_ATTR http_context_reset(esp_ws_obj_t *ctx) {
     ctx->method = none;
     ctx->header_key = mp_const_none;
     ctx->headers = mp_obj_new_list(0, NULL);
-    ctx->uri = mp_const_none;
+    ctx->str_path = mp_const_none;
     ctx->body = mp_const_none;
     ctx->str_method = mp_const_none;
     ctx->to_send = NULL;
@@ -135,7 +135,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
                 } else {
                     pesp->str_method = mp_obj_new_str(method, strlen(method), true);
                     pesp->method = strcmp(method, "GET") == 0 ? get : other;
-                    pesp->state = uri;
+                    pesp->state = path;
                 }
             } else {
                 http_context_add_char(pesp, cc);
@@ -149,9 +149,9 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
                 http_context_add_char(pesp, cc);
             }
             break;
-        case uri:
+        case path:
             if (cc == ' ') {
-                pesp->uri = http_context_mpstr_and_reset(pesp);
+                pesp->str_path = http_context_mpstr_and_reset(pesp);
                 pesp->state = http_version;
             } else {
                 http_context_add_char(pesp, cc);
@@ -397,20 +397,59 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_listen(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_listen_obj, mod_esp_ws_listen);
 
+
 // send method GET, POST, default 'GET', URL, default '/', body, default none
+STATIC const mp_arg_t async_send_args[] = {
+    {MP_QSTR_method, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},
+    {MP_QSTR_path, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},
+    {MP_QSTR_body, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}}
+};
+#define GPIO_ATTACHNUM_ARGS MP_ARRAY_SIZE(async_send_args)
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_async_send(mp_obj_t self_in, mp_obj_t buf_in) {
-    esp_ws_obj_t *self = self_in;
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_async_send(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+    esp_ws_obj_t *self = args[0];
 
-    const char *body_base = "GET / HTTP/1.1\r\n";
-    uint16_t body_base_size = strlen(body_base);
-    esp_make_http_to_send(self, mp_const_none, body_base, body_base_size);
+    mp_arg_val_t arg_vals[MP_ARRAY_SIZE(async_send_args)];
+    mp_arg_parse_all(n_args - 1, args + 1, kwargs, MP_ARRAY_SIZE(async_send_args), async_send_args, arg_vals);
 
-    // TODO: manage this return value (and similarly others
-    espconn_connect(&self->esp_conn);
-    return mp_const_none;
+    if (arg_vals[0].u_obj == mp_const_none) {
+        self->str_method = mp_obj_new_str("GET", strlen("GET"), true);
+    } else {
+        self->str_method = arg_vals[0].u_obj;
+    }
+    mp_buffer_info_t method;
+    mp_get_buffer_raise(self->str_method, &method, MP_BUFFER_READ);
+
+    if (arg_vals[1].u_obj == mp_const_none) {
+        self->str_path = mp_obj_new_str("/", strlen("/"), true);
+    } else {
+        self->str_path = arg_vals[1].u_obj;
+    }
+    mp_buffer_info_t path;
+    mp_get_buffer_raise(self->str_path, &path, MP_BUFFER_READ);
+    
+    const char *version = "HTTP/1.1\r\n";
+    uint16_t body_base_size = method.len + 1 + path.len + 1 + strlen(version);
+
+    char *body_base = (char *)m_malloc(self->len + 1);  // add 1 for terminating null as we use sprintf here
+    char *bp = body_base;
+    memcpy(bp, method.buf, method.len);
+    bp += method.len;
+    *bp++ = ' ';
+    memcpy(bp,  path.buf, path.len);
+    bp += path.len;
+    *bp++ = ' ';
+    memcpy(bp, version, strlen(version));
+    bp += strlen(version);
+    *bp = '\0';
+
+    if (strlen(body_base) != body_base_size) {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "calculated body is different to result"));
+    }
+    esp_make_http_to_send(self, arg_vals[2].u_obj, body_base, body_base_size);
+    return mp_obj_new_int(espconn_connect(&self->esp_conn));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_esp_ws_async_send_obj, mod_esp_ws_async_send);
+MP_DEFINE_CONST_FUN_OBJ_KW(mod_esp_ws_async_send_obj, 0, mod_esp_ws_async_send);
 
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_headers(mp_obj_t self_in) {
@@ -425,11 +464,11 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_body(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_body_obj, mod_esp_ws_body);
 
-STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_uri(mp_obj_t self_in) {
+STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_path(mp_obj_t self_in) {
     esp_ws_obj_t *self = self_in;
-    return self->uri;
+    return self->str_path;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_uri_obj, mod_esp_ws_uri);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mod_esp_ws_path_obj, mod_esp_ws_path);
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_method(mp_obj_t self_in) {
     esp_ws_obj_t *self = self_in;
@@ -449,7 +488,7 @@ STATIC const mp_map_elem_t esp_ws_locals_dict_table[] = {
     // the following could go into a dictionary like the uwsi environ, then I can use 'body' in blah
     {MP_OBJ_NEW_QSTR(MP_QSTR_body), (mp_obj_t)&mod_esp_ws_body_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_headers), (mp_obj_t)&mod_esp_ws_headers_obj},
-    {MP_OBJ_NEW_QSTR(MP_QSTR_uri), (mp_obj_t)&mod_esp_ws_uri_obj},
+    {MP_OBJ_NEW_QSTR(MP_QSTR_path), (mp_obj_t)&mod_esp_ws_path_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_method), (mp_obj_t)&mod_esp_ws_method_obj},
     {MP_OBJ_NEW_QSTR(MP_QSTR_status), (mp_obj_t)&mod_esp_ws_status_obj}
 };

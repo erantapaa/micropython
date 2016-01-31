@@ -199,10 +199,10 @@ STATIC const mp_arg_t gpio_attach_args[] = {
     {MP_QSTR_edge, MP_ARG_INT|MP_ARG_KW_ONLY, {.u_int = GPIO_PIN_INTR_ANYEDGE}},
     {MP_QSTR_debounce, MP_ARG_INT|MP_ARG_KW_ONLY, {.u_int = 0}}
 };
-#define SMARTCONFIG_RUN_NUM_ARGS MP_ARRAY_SIZE(gpio_attach_args)
+#define GPIO_ATTACHNUM_ARGS MP_ARRAY_SIZE(gpio_attach_args)
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t gpio_attach(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    mp_arg_val_t vals[SMARTCONFIG_RUN_NUM_ARGS];
+    mp_arg_val_t vals[GPIO_ATTACHNUM_ARGS];
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(gpio_attach_args), gpio_attach_args, vals);
 
     pmap_t *pmp = pmap(vals[0].u_int);
