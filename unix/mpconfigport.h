@@ -104,6 +104,7 @@
 #define MICROPY_PY_UHEAPQ           (1)
 #define MICROPY_PY_UHASHLIB         (1)
 #define MICROPY_PY_UBINASCII        (1)
+#define MICROPY_PY_URANDOM          (1)
 #ifndef MICROPY_PY_USELECT
 #define MICROPY_PY_USELECT          (1)
 #endif
@@ -182,6 +183,8 @@ extern const struct _mp_obj_module_t mp_module_jni;
 
 // type definitions for the specific machine
 
+// assume that if we already defined the obj repr then we also defined types
+#ifndef MICROPY_OBJ_REPR
 #ifdef __LP64__
 typedef long mp_int_t; // must be pointer size
 typedef unsigned long mp_uint_t; // must be pointer size
@@ -190,6 +193,7 @@ typedef unsigned long mp_uint_t; // must be pointer size
 // regardless of actual size.
 typedef int mp_int_t; // must be pointer size
 typedef unsigned int mp_uint_t; // must be pointer size
+#endif
 #endif
 
 #define BYTES_PER_WORD sizeof(mp_int_t)
@@ -209,6 +213,10 @@ void mp_unix_free_exec(void *ptr, mp_uint_t size);
 void mp_unix_mark_exec(void);
 #define MP_PLAT_ALLOC_EXEC(min_size, ptr, size) mp_unix_alloc_exec(min_size, ptr, size)
 #define MP_PLAT_FREE_EXEC(ptr, size) mp_unix_free_exec(ptr, size)
+
+#ifndef MP_NOINLINE
+#define MP_NOINLINE __attribute__((noinline))
+#endif
 
 #if MICROPY_PY_OS_DUPTERM
 #define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)

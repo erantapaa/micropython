@@ -1,9 +1,9 @@
 /*
- * This file is part of the Micro Python project, http://micropython.org/
+ * This file is part of the MicroPython project, http://micropython.org/
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2013, 2014 Damien P. George
+ * Copyright (c) 2016 Damien P. George
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,15 +24,20 @@
  * THE SOFTWARE.
  */
 
-extern TIM_HandleTypeDef TIM5_Handle;
+// select nan-boxing object model
+#define MICROPY_OBJ_REPR (MICROPY_OBJ_REPR_D)
 
-extern const mp_obj_type_t pyb_timer_type;
+// native emitters don't work with nan-boxing
+#define MICROPY_EMIT_X86 (0)
+#define MICROPY_EMIT_X64 (0)
+#define MICROPY_EMIT_THUMB (0)
+#define MICROPY_EMIT_ARM (0)
 
-void timer_init0(void);
-void timer_tim5_init(void);
-TIM_HandleTypeDef *timer_tim6_init(uint freq);
-void timer_deinit(void);
-uint32_t timer_get_source_freq(uint32_t tim_id);
-void timer_irq_handler(uint tim_id);
+#include <stdint.h>
 
-TIM_HandleTypeDef *pyb_timer_get_handle(mp_obj_t timer);
+typedef int64_t mp_int_t;
+typedef uint64_t mp_uint_t;
+#define UINT_FMT "%llu"
+#define INT_FMT "%lld"
+
+#include <mpconfigport.h>
