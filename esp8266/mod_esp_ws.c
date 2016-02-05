@@ -21,6 +21,12 @@
 
 extern int skip_atoi(char **nptr);
 int ets_sprintf(char *str, const char *format, ...);
+void  vPortFree(void *ptr, char * file, int line);
+void *pvPortMalloc(size_t xWantedSize, char * file, int line);
+void *pvPortZalloc(size_t, char * file, int line);
+void *vPortMalloc(size_t xWantedSize);
+void  pvPortFree(void *ptr);
+void *pvPortRealloc(void *pv, size_t size, char * file, int line);
 
 
 void ICACHE_FLASH_ATTR http_context_reset(esp_ws_obj_t *ctx) {
@@ -59,7 +65,12 @@ char ICACHE_FLASH_ATTR *http_context_mpstr_and_reset(esp_ws_obj_t *ctx) {
     return bp;
 }
 
-void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_str_t *mp_str, const char *body_base, uint16_t body_base_size) {
+void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_t mp_obj, const char *body_base, uint16_t body_base_size) {
+    mp_obj_str_t *mp_str = mp_obj;
+    
+    if (!MP_OBJ_IS_STR(mp_obj)) {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "not str in body"));
+    }
     int  body_size = mp_str == mp_const_none ? 0 : mp_str->len;
 
     if (body_size) {
@@ -69,7 +80,7 @@ void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_str_t *m
         int body_size_str_len = strlen(body_size_str);
 
         pesp->to_send_len = body_base_size + pesp->outgoing_headers_len + body_size_str_len + 2 + mp_str->len;
-        pesp->to_send = (char *)m_malloc(pesp->to_send_len);
+        pesp->to_send = (char *)os_malloc(pesp->to_send_len);
 
         memcpy(pesp->to_send, body_base, body_base_size);
         if (pesp->outgoing_headers_len) {
@@ -80,7 +91,7 @@ void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_str_t *m
         memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len + body_size_str_len + 2, (char *)mp_str->data, mp_str->len);
     } else {
         pesp->to_send_len = body_base_size + pesp->outgoing_headers_len + 2;  // + extra \r\n
-        pesp->to_send = (char *)m_malloc(pesp->to_send_len);
+        pesp->to_send = (char *)os_malloc(pesp->to_send_len);
         memcpy(pesp->to_send, body_base, body_base_size);
         if (pesp->outgoing_headers_len) {
             memcpy(pesp->to_send + body_base_size, pesp->outgoing_headers_str, pesp->outgoing_headers_len);
@@ -121,7 +132,7 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
                     status = bufinfo.buf;
                     status_len = bufinfo.len;
                 }
-            } else if (!MP_OBJ_IS_TYPE(client_reply,  &mp_type_str)) {
+            } else if (!MP_OBJ_IS_STR(client_reply)) {
                 nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "view must return tuple or str"));
             } 
         }
@@ -129,7 +140,7 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
         const char *body_version = "HTTP/1.1 ";
         const char *body_con_close = "Connection: close\r\n";
         uint16_t body_base_size = strlen(body_version) + status_len + 2 + strlen(body_con_close); // 2 for \r\n
-        char *body_base = (char *)m_malloc(body_base_size + 1); // adding 1 for a null to debug
+        char body_base[body_base_size + 1]; // adding 1 for a null to debug
         char *bp = body_base;
         memcpy(bp, body_version, strlen(body_version));
         bp += strlen(body_version);
@@ -142,7 +153,6 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
         *bp = '\0';
         esp_make_http_to_send(pesp, (mp_obj_str_t *)client_reply, body_base, body_base_size);
         espconn_sent(&pesp->esp_conn, (uint8 *)pesp->to_send, (uint16)pesp->to_send_len);
-        m_free(body_base);
     }
 }
 
@@ -305,7 +315,7 @@ static void ICACHE_FLASH_ATTR webserver_discon(void *arg)
 static void ICACHE_FLASH_ATTR socket_sent_callback(void *arg) {
     esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
     if (pesp->to_send != NULL) {
-        m_free(pesp->to_send);
+        os_free(pesp->to_send);
     }
     pesp->to_send = NULL;
     pesp->to_send_len = 0;
@@ -368,6 +378,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_ws_make_new(const mp_obj_type_t *type_in, 
     mp_arg_val_t vals[ESP_WS_INIT_NUM_ARGS];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, ESP_WS_INIT_NUM_ARGS, esp_ws_init_args, vals);
     
+    printf("new\n");
     esp_ws_obj_t *self = m_new_obj(esp_ws_obj_t);
     self->base.type = &esp_ws_type;
 
@@ -434,7 +445,6 @@ STATIC const mp_arg_t async_send_args[] = {
     {MP_QSTR_path, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}},
     {MP_QSTR_body, MP_ARG_OBJ|MP_ARG_KW_ONLY, {.u_obj = mp_const_none}}
 };
-#define GPIO_ATTACHNUM_ARGS MP_ARRAY_SIZE(async_send_args)
 
 STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_async_send(mp_uint_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
     esp_ws_obj_t *self = args[0];
@@ -460,8 +470,7 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_async_send(mp_uint_t n_args, const 
     
     const char *version = "HTTP/1.1\r\n";
     uint16_t body_base_size = method.len + 1 + path.len + 1 + strlen(version);
-
-    char *body_base = (char *)m_malloc(self->len + 1);  // add 1 for terminating null as we use sprintf here
+    char body_base[body_base_size + 1];  // add 1 for terminating null as we use sprintf here
     char *bp = body_base;
     memcpy(bp, method.buf, method.len);
     bp += method.len;
@@ -472,9 +481,13 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t mod_esp_ws_async_send(mp_uint_t n_args, const 
     memcpy(bp, version, strlen(version));
     bp += strlen(version);
     *bp = '\0';
-
     if (strlen(body_base) != body_base_size) {
         nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "calculated body is different to result"));
+    }
+    if (arg_vals[2].u_obj != mp_const_none) {
+        if (!MP_OBJ_IS_STR(arg_vals[2].u_obj)) {
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "not str in body"));
+        }
     }
     esp_make_http_to_send(self, arg_vals[2].u_obj, body_base, body_base_size);
     return mp_obj_new_int(espconn_connect(&self->esp_conn));
