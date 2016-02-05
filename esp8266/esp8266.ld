@@ -101,6 +101,11 @@ SECTIONS
         *strtoll.o(.literal* .text*)
         *utils.o(.literal* .text*)
         *printf.o(.literal* .text*)
+        *printf.o(.literal* .text*)
+
+        *mod_esp_ws.o(.literal* .text*)
+        *mod_esp_smartconfig.o(.literal* .text*)
+        *mod_esp_wifi_events.o(.literal* .text*)
 
         *esp_irom.o(.literal* .text*)
 

@@ -51,6 +51,7 @@
 #include "mod_esp_queue.h"
 #include "mod_esp_smartconfig.h"
 #include "mod_esp_wifi_events.h"
+#include "mod_esp_ws.h"
 
 #define MODESP_ESPCONN (1)
 
@@ -121,6 +122,9 @@ STATIC mp_obj_t esp_socket_close(mp_obj_t self_in) {
     if (esp_socket_listening == s) {
         gc_free(esp_socket_listening);
         esp_socket_listening = NULL;
+        printf("sock listening == s, gc_free");
+    } else {
+        printf("sock listening != s, gc_free");
     }
 
     if (s->espconn->state != ESPCONN_NONE && s->espconn->state != ESPCONN_CLOSE) {
@@ -128,9 +132,10 @@ STATIC mp_obj_t esp_socket_close(mp_obj_t self_in) {
     }
 
     if (s->connlist != NULL) {
+        printf("connlist set len 0");
         mp_obj_list_set_len(s->connlist, 0);
     }
-
+    s->recvbuf = NULL;
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_socket_close_obj, esp_socket_close);
@@ -141,7 +146,9 @@ STATIC mp_obj_t esp_socket___del__(mp_obj_t self_in) {
 
     esp_socket_close(self_in);
 
+    printf("__del__ deleted\n");
     if (s->fromserver) {
+        printf("server deleted\n");
         espconn_delete(s->espconn);
     }
 
@@ -166,22 +173,29 @@ STATIC void esp_socket_recv_callback(void *arg, char *pdata, unsigned short len)
     esp_socket_obj_t *s = conn->reverse;
 
     if (s->cb_recv != mp_const_none) {
+        printf("new bytes\n");
         call_function_2_protected(s->cb_recv, s, mp_obj_new_bytes((byte *)pdata, len));
     } else {
         if (s->recvbuf == NULL) {
+            printf("recv null \n");
             s->recvbuf = m_new(uint8_t, len);
             s->recvbuf_len = len;
             if (s->recvbuf != NULL) {
                 memcpy(s->recvbuf, pdata, len);
+            } else {
+                printf("failed alloc 1\n");
             }
         } else {
             s->recvbuf = m_renew(uint8_t, s->recvbuf, s->recvbuf_len, s->recvbuf_len + len);
             if (s->recvbuf != NULL) {
                 memcpy(&s->recvbuf[s->recvbuf_len], pdata, len);
                 s->recvbuf_len += len;
+            } else {
+                printf("failed alloc 3\n");
             }
         }
         if (s->recvbuf == NULL) {
+            printf("close 2\n");
             esp_socket_close(s);
             return;
         }
@@ -204,6 +218,7 @@ STATIC void esp_socket_disconnect_callback(void *arg) {
     if (s->cb_disconnect != mp_const_none) {
         call_function_1_protected(s->cb_disconnect, s);
     }
+    s->recvbuf = NULL;
     esp_socket_close(s);
 }
 
@@ -214,6 +229,7 @@ STATIC void esp_socket_reconnect_callback(void *arg, sint8 err) {
     if (s->cb_reconnect != mp_const_none) {
         call_function_1_protected(s->cb_reconnect, s);
     }
+    s->recvbuf = NULL;
     esp_socket_close(s);
 }
 
@@ -333,7 +349,10 @@ STATIC mp_obj_t esp_socket_send(mp_obj_t self_in, mp_obj_t buf_in) {
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(buf_in, &bufinfo, MP_BUFFER_READ);
 
-    espconn_sent(s->espconn, bufinfo.buf, bufinfo.len);
+    int32_t err;
+    if ((err = espconn_sent(s->espconn, bufinfo.buf, bufinfo.len)) !=  ESPCONN_OK) {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, "espconn_sent Not OK"));
+    }
 
     return mp_obj_new_int(bufinfo.len);
 }
@@ -669,6 +688,7 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_smartconfig), (mp_obj_t)&mp_module_esp_smartconfig},
     { MP_OBJ_NEW_QSTR(MP_QSTR_wifi_events), (mp_obj_t)&mp_module_esp_wifi_events},
     { MP_OBJ_NEW_QSTR(MP_QSTR_getaddrinfo), (mp_obj_t)&esp_getaddrinfo_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_ws), (mp_obj_t)&esp_ws_type },
     #endif
 
 #if MODESP_INCLUDE_CONSTANTS

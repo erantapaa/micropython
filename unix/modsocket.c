@@ -155,9 +155,11 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(socket_listen_obj, socket_listen);
 
 STATIC mp_obj_t socket_accept(mp_obj_t self_in) {
     mp_obj_socket_t *self = MP_OBJ_TO_PTR(self_in);
-    struct sockaddr addr;
+    // sockaddr_storage isn't stack-friendly (129 bytes or so)
+    //struct sockaddr_storage addr;
+    byte addr[32];
     socklen_t addr_len = sizeof(addr);
-    int fd = accept(self->fd, &addr, &addr_len);
+    int fd = accept(self->fd, (struct sockaddr*)&addr, &addr_len);
     RAISE_ERRNO(fd, errno);
 
     mp_obj_tuple_t *t = MP_OBJ_TO_PTR(mp_obj_new_tuple(2, NULL));
@@ -517,6 +519,16 @@ STATIC mp_obj_t mod_socket_sockaddr(mp_obj_t sockaddr_in) {
             t->items[0] = MP_OBJ_NEW_SMALL_INT(AF_INET);
             t->items[1] = mp_obj_new_bytes((byte*)&sa->sin_addr, sizeof(sa->sin_addr));
             t->items[2] = MP_OBJ_NEW_SMALL_INT(ntohs(sa->sin_port));
+            return MP_OBJ_FROM_PTR(t);
+        }
+        case AF_INET6: {
+            struct sockaddr_in6 *sa = (struct sockaddr_in6*)bufinfo.buf;
+            mp_obj_tuple_t *t = MP_OBJ_TO_PTR(mp_obj_new_tuple(5, NULL));
+            t->items[0] = MP_OBJ_NEW_SMALL_INT(AF_INET6);
+            t->items[1] = mp_obj_new_bytes((byte*)&sa->sin6_addr, sizeof(sa->sin6_addr));
+            t->items[2] = MP_OBJ_NEW_SMALL_INT(ntohs(sa->sin6_port));
+            t->items[3] = MP_OBJ_NEW_SMALL_INT(ntohl(sa->sin6_flowinfo));
+            t->items[4] = MP_OBJ_NEW_SMALL_INT(ntohl(sa->sin6_scope_id));
             return MP_OBJ_FROM_PTR(t);
         }
         default: {

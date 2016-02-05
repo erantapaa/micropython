@@ -1,5 +1,6 @@
 import esp
 import ujson, re
+import gc
 
 
 class ControlServer:
@@ -39,7 +40,9 @@ class ControlServer:
                         sock.send(self.make_response())
                 except Exception as ee:
                     sock.send(self.make_response(data={'error': str(ee)}, status='400 Bad Request'))
+                print("PYTHON CALLING CLOSE")
                 sock.close()
+                gc.collect()
 
     def onconnect(self, sock):
         self.state = 'action'
@@ -56,4 +59,4 @@ class ControlServer:
 def jsh(data):
     print("got %s\n" % str(data))
 
-cs = ControlServer(data_cb=jsh)
+sc = ControlServer(data_cb=jsh)
