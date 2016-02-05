@@ -59,8 +59,15 @@ char ICACHE_FLASH_ATTR *http_context_get_and_reset(esp_ws_obj_t *ctx) {
     return ctx->buffer;
 }
 
-char ICACHE_FLASH_ATTR *http_context_mpstr_and_reset(esp_ws_obj_t *ctx) {
-    mp_obj_t bp = mp_obj_new_str(ctx->buffer, ctx->ptr - ctx->buffer, true);
+char ICACHE_FLASH_ATTR *http_context_mpstr_and_reset(esp_ws_obj_t *ctx, bool intern) {
+#if 0
+    printf("new inten %d '", intern);
+    for (int ii = 0; ii < (ctx->ptr - ctx->buffer); ii++) {
+        printf("%c", ctx->buffer[ii]);
+    }
+    printf("'\n");
+#endif
+    mp_obj_t bp = mp_obj_new_str(ctx->buffer, ctx->ptr - ctx->buffer, intern);
     ctx->ptr = ctx->buffer;
     return bp;
 }
@@ -80,7 +87,7 @@ void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_t mp_obj
         int body_size_str_len = strlen(body_size_str);
 
         pesp->to_send_len = body_base_size + pesp->outgoing_headers_len + body_size_str_len + 2 + mp_str->len;
-        pesp->to_send = (char *)os_malloc(pesp->to_send_len);
+        pesp->to_send = (char *)m_malloc(pesp->to_send_len);
 
         memcpy(pesp->to_send, body_base, body_base_size);
         if (pesp->outgoing_headers_len) {
@@ -91,7 +98,7 @@ void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_t mp_obj
         memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len + body_size_str_len + 2, (char *)mp_str->data, mp_str->len);
     } else {
         pesp->to_send_len = body_base_size + pesp->outgoing_headers_len + 2;  // + extra \r\n
-        pesp->to_send = (char *)os_malloc(pesp->to_send_len);
+        pesp->to_send = (char *)m_malloc(pesp->to_send_len);
         memcpy(pesp->to_send, body_base, body_base_size);
         if (pesp->outgoing_headers_len) {
             memcpy(pesp->to_send + body_base_size, pesp->outgoing_headers_str, pesp->outgoing_headers_len);
@@ -105,7 +112,7 @@ void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_t mp_obj
 void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
     mp_obj_t client_reply = mp_const_none;
 
-    if (pesp->callback) {
+    if (pesp->callback != mp_const_none) {
         nlr_buf_t nlr;
         if (nlr_push(&nlr) == 0) {
             client_reply = mp_call_function_1(pesp->callback, pesp);
@@ -184,7 +191,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             break;
         case status_code:
             if (cc == '\n') {
-                pesp->str_status = http_context_mpstr_and_reset(pesp);
+                pesp->str_status = http_context_mpstr_and_reset(pesp, true);
                 pesp->state = header_key;
             } else {
                 http_context_add_char(pesp, cc);
@@ -192,7 +199,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             break;
         case path:
             if (cc == ' ') {
-                pesp->str_path = http_context_mpstr_and_reset(pesp);
+                pesp->str_path = http_context_mpstr_and_reset(pesp, true);
                 pesp->state = http_version;
             } else {
                 http_context_add_char(pesp, cc);
@@ -212,6 +219,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
                 if (strcmp("Content-Length", hname) == 0) {
                     pesp->state = content_length_sep;
                 } else {
+                    // very few of these so intern them
                     pesp->header_key = mp_obj_new_str(hname, strlen(hname), true);
                     pesp->state = header_sep;
                }
@@ -245,7 +253,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
             if (cc == '\n') {
                 mp_obj_t atuple[2] = {
                     pesp->header_key,
-                    http_context_mpstr_and_reset(pesp)
+                    http_context_mpstr_and_reset(pesp, false)
                 };
                 mp_obj_list_append(pesp->headers, mp_obj_new_tuple(2, atuple));
                 pesp->state = possible_body;
@@ -280,7 +288,7 @@ static  ICACHE_FLASH_ATTR void webserver_recv(void *arg, char *pusrdata, unsigne
         int size = pesp->ptr - pesp->buffer;
         if (size) {
             if (pesp->content_length == pesp->content_length) {
-                pesp->body = http_context_mpstr_and_reset(pesp);
+                pesp->body = http_context_mpstr_and_reset(pesp, false);
                 ws_reply(pesp, pesp_conn);
             } else {
                 http_context_add_char(pesp, '\0');    // go through this for out by one overflow check
@@ -315,7 +323,7 @@ static void ICACHE_FLASH_ATTR webserver_discon(void *arg)
 static void ICACHE_FLASH_ATTR socket_sent_callback(void *arg) {
     esp_ws_obj_t *pesp = (esp_ws_obj_t *)((struct espconn *)arg)->reverse;
     if (pesp->to_send != NULL) {
-        os_free(pesp->to_send);
+        m_free(pesp->to_send);
     }
     pesp->to_send = NULL;
     pesp->to_send_len = 0;
