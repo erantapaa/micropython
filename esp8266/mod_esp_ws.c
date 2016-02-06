@@ -73,20 +73,23 @@ char ICACHE_FLASH_ATTR *http_context_mpstr_and_reset(esp_ws_obj_t *ctx, bool int
 }
 
 void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_t mp_obj, const char *body_base, uint16_t body_base_size) {
-    mp_obj_str_t *mp_str = mp_obj;
+    unsigned int  body_size = 0;
+    const char *body = NULL;
     
-    if (!MP_OBJ_IS_STR(mp_obj)) {
-        nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "not str in body"));
+    if (mp_obj != mp_const_none) {
+        if (!MP_OBJ_IS_STR_OR_BYTES(mp_obj)) {
+            nlr_raise(mp_obj_new_exception_msg(&mp_type_ValueError, "not str in body"));
+        } else {
+            body = mp_obj_str_get_data(mp_obj, &body_size);
+        }
     }
-    int  body_size = mp_str == mp_const_none ? 0 : mp_str->len;
-
     if (body_size) {
         const char *bls = "Content-Length: %d\r\n";
         char body_size_str[strlen(bls) + 10];
-        ets_sprintf(body_size_str, bls, mp_str->len);
+        ets_sprintf(body_size_str, bls, body_size);
         int body_size_str_len = strlen(body_size_str);
 
-        pesp->to_send_len = body_base_size + pesp->outgoing_headers_len + body_size_str_len + 2 + mp_str->len;
+        pesp->to_send_len = body_base_size + pesp->outgoing_headers_len + body_size_str_len + 2 + body_size;
         pesp->to_send = (char *)m_malloc(pesp->to_send_len);
 
         memcpy(pesp->to_send, body_base, body_base_size);
@@ -95,7 +98,7 @@ void ICACHE_FLASH_ATTR esp_make_http_to_send(esp_ws_obj_t *pesp, mp_obj_t mp_obj
         }
         memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len, body_size_str, body_size_str_len);
         memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len + body_size_str_len, "\r\n", 2);
-        memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len + body_size_str_len + 2, (char *)mp_str->data, mp_str->len);
+        memcpy(pesp->to_send + body_base_size + pesp->outgoing_headers_len + body_size_str_len + 2, body, body_size);
     } else {
         pesp->to_send_len = body_base_size + pesp->outgoing_headers_len + 2;  // + extra \r\n
         pesp->to_send = (char *)m_malloc(pesp->to_send_len);
@@ -118,6 +121,7 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
             client_reply = mp_call_function_1(pesp->callback, pesp);
         } else {
            mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+           return;
         }
     }
 
@@ -126,8 +130,7 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
     // if nothing return 200 OK
     if (pesp->method != reply) {
         const char *status = "200 OK";
-        uint16_t status_len = strlen(status);
-        mp_buffer_info_t bufinfo;
+        unsigned int status_len = strlen(status);
         if (client_reply != mp_const_none) {
             if (MP_OBJ_IS_TYPE(client_reply, &mp_type_tuple)) {
                 mp_obj_tuple_t *tp = client_reply;
@@ -135,19 +138,16 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
                     nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "view reply must be tuple of 2"));
                 } else {
                     client_reply = tp->items[0];
-                    mp_get_buffer_raise(tp->items[1], &bufinfo, MP_BUFFER_READ);
-                    status = bufinfo.buf;
-                    status_len = bufinfo.len;
+                    status = mp_obj_str_get_data(tp->items[1], &status_len);
                 }
             } else if (!MP_OBJ_IS_STR(client_reply)) {
                 nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "view must return tuple or str"));
             } 
         }
-        
         const char *body_version = "HTTP/1.1 ";
         const char *body_con_close = "Connection: close\r\n";
         uint16_t body_base_size = strlen(body_version) + status_len + 2 + strlen(body_con_close); // 2 for \r\n
-        char body_base[body_base_size + 1]; // adding 1 for a null to debug
+        char *body_base = m_malloc(body_base_size + 1); // adding 1 for a null to debug
         char *bp = body_base;
         memcpy(bp, body_version, strlen(body_version));
         bp += strlen(body_version);
@@ -158,8 +158,15 @@ void ICACHE_FLASH_ATTR ws_reply(esp_ws_obj_t *pesp, struct espconn *pesp_conn) {
         memcpy(bp, body_con_close, strlen(body_con_close));
         bp += strlen(body_con_close);
         *bp = '\0';
-        esp_make_http_to_send(pesp, (mp_obj_str_t *)client_reply, body_base, body_base_size);
-        espconn_sent(&pesp->esp_conn, (uint8 *)pesp->to_send, (uint16)pesp->to_send_len);
+
+        nlr_buf_t nlr;
+
+        if (nlr_push(&nlr) == 0) {
+            esp_make_http_to_send(pesp, client_reply, body_base, body_base_size);
+            espconn_sent(&pesp->esp_conn, (uint8 *)pesp->to_send, (uint16)pesp->to_send_len);
+        } else {
+           mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+        }
     }
 }
 
@@ -355,19 +362,20 @@ STATIC ICACHE_FLASH_ATTR uint16_t hdr_len(mp_obj_t obj_in, char *target) {
         if (tp->len != 2) {
             nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError, "header inner tuple must be len 2"));
         }
-        mp_buffer_info_t bufinfo;
-        mp_get_buffer_raise(tp->items[0], &bufinfo, MP_BUFFER_READ);
+        // TODO: change this to use get_buffer
+        unsigned int buf_len;
+        const char *buf = mp_obj_str_get_data(tp->items[0], &buf_len);
         if (target != NULL) {
-            memcpy(target + len, bufinfo.buf, bufinfo.len);
-            memcpy(target + len + bufinfo.len, ": ", 2);
+            memcpy(target + len, buf, buf_len);
+            memcpy(target + len + buf_len, ": ", 2);
         }
-        len += bufinfo.len + 2;  // blah + ':  '
-        mp_get_buffer_raise(tp->items[1], &bufinfo, MP_BUFFER_READ);
+        len += buf_len + 2;  // blah + ':  '
+        buf = mp_obj_str_get_data(tp->items[1], &buf_len);
         if (target != NULL) {
-            memcpy(target + len, bufinfo.buf, bufinfo.len);
-            memcpy(target + len + bufinfo.len, "\r\n", 2);
+            memcpy(target + len, buf, buf_len);
+            memcpy(target + len + buf_len, "\r\n", 2);
         }
-        len += bufinfo.len + 2;  // blah + '\r\n'
+        len += buf_len + 2;  // blah + '\r\n'
     }
     return len;
 }
@@ -386,7 +394,6 @@ STATIC ICACHE_FLASH_ATTR mp_obj_t esp_ws_make_new(const mp_obj_type_t *type_in, 
     mp_arg_val_t vals[ESP_WS_INIT_NUM_ARGS];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, ESP_WS_INIT_NUM_ARGS, esp_ws_init_args, vals);
     
-    printf("new\n");
     esp_ws_obj_t *self = m_new_obj(esp_ws_obj_t);
     self->base.type = &esp_ws_type;
 
