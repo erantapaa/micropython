@@ -2,6 +2,7 @@
 #include <string.h>
 #include <c_types.h>
 
+#include "py/gc.h"
 #include "py/lexer.h"
 #include "py/runtime.h"
 #include "esp_frozen.h"
@@ -23,6 +24,7 @@ pb_context_t *irom_make_context(const esp_frozen_t *pp) {
 void irom_close(void *stream_data)  {
     pb_context_t *ctx = (pb_context_t *)stream_data;
     m_del_obj(pb_context_t, ctx);
+    gc_collect();
 }
 
 mp_uint_t irom_next_char(void *stream_data) {

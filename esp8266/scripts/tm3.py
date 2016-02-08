@@ -4,6 +4,8 @@ import gc
 import network
 from wifi_events import WifiEventManager
 # from srv import ControlServer
+from sm import SM
+from pinset import PinSet
 
 # button
 # smartconfig
@@ -14,27 +16,6 @@ class Sonoff:
     GREEN_LED = 13
     RELAY = 12
 
-class PinSet:
-    def __init__(self, pin=16):
-        self.pin = pin
-        if pin == 16:
-            esp.gpio.p16_init()
-            esp.gpio.p16_write(1)
-        else:
-            self.pg = pyb.Pin(pin, pyb.Pin.OUT_PP)
-            self.pg.high()
-
-    def on(self):
-        if self.pin == 16:
-            esp.gpio.p16_write(0)
-        else:
-            self.pg.low()
-
-    def off(self):
-        if self.pin == 16:
-            esp.gpio.p16_write(1)
-        else:
-            self.pg.high()
 
 
 class Indicator:
@@ -85,45 +66,6 @@ class Indicator:
 # json
 #  (switch on 0, relay on 12 and green led on 13)
 
-
-class SM:
-    def wait(self):
-        print("wait")
-
-    def find_channel(self):
-        print("find channel")
-
-    def getting_ssid_pswd(self, dtype):
-        print("getting ssid type", dtype)
-
-    def link(self, ssid, password):
-        print("Link", ssid, password)
-        self.indicator.blink(period=500)
-        network.disconnect()
-        network.connect(ssid, password)
-
-    def link_over(self, phone_ip):
-        print("over done", phone_ip)
-        self.indicator.indicate(self.iostate)
-        esp.smartconfig.stop()
-
-    def start(self, iostate):
-        self.iostate = iostate
-        self.running = True
-        esp.smartconfig.start()
-
-    def stop(self):
-        self.running = False
-        esp.smartconfig.stop()
-
-    def __init__(self, indicator):
-        esp.smartconfig.init(wait=lambda: self.wait,
-                             find_channel=lambda: self.find_channel(),
-                             getting_ssid_pswd=lambda dtype: self.getting_ssid_pswd(dtype),
-                             link=lambda ssid, password: self.link(ssid, password),
-                             link_over=lambda phone_ip: self.link_over(phone_ip))
-        self.indicator = indicator
-        self.running = False
 
 
 class ButtonHandler:
@@ -226,6 +168,5 @@ tm.add_q('button', bq)
 
 
 def jsh(data):
-    print("got %s\n" % str(data))
     gc.collect()
 

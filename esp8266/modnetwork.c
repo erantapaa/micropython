@@ -52,10 +52,12 @@ STATIC mp_obj_t esp_connect(mp_uint_t n_args, const mp_obj_t *args) {
     mp_uint_t len;
     const char *p;
 
+    memset(&config, 0, sizeof (config));
     p = mp_obj_str_get_data(args[0], &len);
     memcpy(config.ssid, p, len);
     p = mp_obj_str_get_data(args[1], &len);
     memcpy(config.password, p, len);
+    printf("ssid '%s' pass '%s'\n", config.ssid, config.password);
 
     error_check(wifi_station_set_config(&config), "Cannot set STA config");
     error_check(wifi_station_connect(), "Cannot connect to AP");

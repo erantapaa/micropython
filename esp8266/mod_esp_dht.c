@@ -68,6 +68,7 @@ extern unsigned xthal_get_ccount(void);
 extern unsigned ets_get_cpu_frequency();
 
 
+#if MICROPY_MODULE_ESP_DHT
 
 const mp_obj_type_t esp_dht_type;
 
@@ -376,3 +377,4 @@ const mp_obj_type_t esp_dht_type = {
     .iternext = NULL,
     .locals_dict = (mp_obj_t)&dht_locals_dict,
 };
+#endif // MICROPY_MODULE_ESP_DHT

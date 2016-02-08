@@ -44,6 +44,7 @@
 #include "esp_1wire.h"
 #include "mod_esp_1wire.h"
 
+#if MICROPY_MODULE_ESP_1WIRE
 STATIC int16_t esp_1wire_handler(pmap_t *pmp, uint32_t now, uint8_t signal)
 {
 
@@ -182,4 +183,4 @@ const mp_obj_type_t esp_1wire_type = {
     .make_new = mod_esp_1wire_make_new,
     .locals_dict = (mp_obj_t)&mod_esp_1wire_locals_dict,
 };
-
+#endif // MICROPY_MODULE_ESP_1WIRE

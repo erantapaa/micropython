@@ -69,11 +69,11 @@ void STATIC ICACHE_FLASH_ATTR smartconfig_callback(sc_status status, void *pdata
             }
             break;
         case SC_STATUS_LINK:
-            if (cb.getting_ssid_pswd_cb != mp_const_none) {
+            if (cb.link_cb != mp_const_none) {
                 struct station_config *sta_conf = pdata;
 
-                mp_obj_t ssid = mp_obj_new_str((const char *)sta_conf->ssid, strlen((const char *)sta_conf->ssid), true);
-                mp_obj_t password = mp_obj_new_str((const char *)sta_conf->password, strlen((const char *)sta_conf->password), true);
+                mp_obj_t ssid = mp_obj_new_str((const char *)sta_conf->ssid, strlen((const char *)sta_conf->ssid), false);
+                mp_obj_t password = mp_obj_new_str((const char *)sta_conf->password, strlen((const char *)sta_conf->password), false);
                 // use this is saving the BSSID
                 // printf("bssid_set: %u\n", sta_conf->bssid_set);
                 // printf("bssid: \"%s\"\n", sta_conf->bssid);
@@ -87,12 +87,13 @@ void STATIC ICACHE_FLASH_ATTR smartconfig_callback(sc_status status, void *pdata
                 
                 call_function_2_protected(cb.link_cb, ssid, password);
             }
-
+            printf("out of link\n");
             // wifi_station_set_config(sta_conf);
 	        //wifi_station_disconnect();
 	        // wifi_station_connect();
             break;
         case SC_STATUS_LINK_OVER:
+            printf("into link over %x\b", (unsigned int)pdata);
             if (cb.link_over_cb != mp_const_none) {
                 call_function_1_protected(cb.link_over_cb, pdata != NULL ?
                                           netutils_format_ipv4_addr((uint8 *)pdata, NETUTILS_BIG) : mp_const_none);

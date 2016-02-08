@@ -44,6 +44,8 @@
 #define MICROPY_MODULE_BUILTIN_INIT (1)
 #define MICROPY_MODULE_ESP_FROZEN   (1)
 #define MICROPY_MODULE_ESP_QUEUE    (1)
+#define MICROPY_MODULE_ESP_DHT      (0)
+#define MICROPY_MODULE_ESP_1WIRE    (0)
 
 // type definitions for the specific machine
 

@@ -53,7 +53,7 @@
 #include "mod_esp_wifi_events.h"
 #include "mod_esp_ws.h"
 
-#define MODESP_ESPCONN (1)
+#define MODESP_ESPCONN (0)
 
 #if MODESP_ESPCONN
 
@@ -488,6 +488,36 @@ STATIC mp_obj_t esp_socket_state(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_socket_state_obj, esp_socket_state);
 
+
+STATIC const mp_map_elem_t esp_socket_locals_dict_table[] = {
+    { MP_OBJ_NEW_QSTR(MP_QSTR___del__), (mp_obj_t)&esp_socket___del___obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_close), (mp_obj_t)&esp_socket_close_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_bind), (mp_obj_t)&esp_socket_bind_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_listen), (mp_obj_t)&esp_socket_listen_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_accept), (mp_obj_t)&esp_socket_accept_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_connect), (mp_obj_t)&esp_socket_connect_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_send), (mp_obj_t)&esp_socket_send_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_recv), (mp_obj_t)&esp_socket_recv_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_sendto), (mp_obj_t)&esp_socket_sendto_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_recvfrom), (mp_obj_t)&esp_socket_recvfrom_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_getpeername), (mp_obj_t)&esp_socket_getpeername_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_onconnect), (mp_obj_t)&esp_socket_onconnect_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_onrecv), (mp_obj_t)&esp_socket_onrecv_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_onsent), (mp_obj_t)&esp_socket_onsent_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_ondisconnect), (mp_obj_t)&esp_socket_ondisconnect_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_onreconnect), (mp_obj_t)&esp_socket_onreconnect_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_state), (mp_obj_t)&esp_socket_state_obj }
+};
+STATIC MP_DEFINE_CONST_DICT(esp_socket_locals_dict, esp_socket_locals_dict_table);
+
+STATIC const mp_obj_type_t esp_socket_type = {
+    { &mp_type_type },
+    .name = MP_QSTR_socket,
+    .make_new = esp_socket_make_new,
+    .locals_dict = (mp_obj_t)&esp_socket_locals_dict,
+};
+#endif
+
 typedef struct _esp_getaddrinfo_cb_struct_t {
     mp_obj_t lambda;
     mp_uint_t port;
@@ -537,35 +567,6 @@ STATIC mp_obj_t esp_getaddrinfo(mp_obj_t host_in, mp_obj_t port_in,
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(esp_getaddrinfo_obj, esp_getaddrinfo);
-
-STATIC const mp_map_elem_t esp_socket_locals_dict_table[] = {
-    { MP_OBJ_NEW_QSTR(MP_QSTR___del__), (mp_obj_t)&esp_socket___del___obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_close), (mp_obj_t)&esp_socket_close_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_bind), (mp_obj_t)&esp_socket_bind_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_listen), (mp_obj_t)&esp_socket_listen_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_accept), (mp_obj_t)&esp_socket_accept_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_connect), (mp_obj_t)&esp_socket_connect_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_send), (mp_obj_t)&esp_socket_send_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_recv), (mp_obj_t)&esp_socket_recv_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_sendto), (mp_obj_t)&esp_socket_sendto_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_recvfrom), (mp_obj_t)&esp_socket_recvfrom_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_getpeername), (mp_obj_t)&esp_socket_getpeername_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_onconnect), (mp_obj_t)&esp_socket_onconnect_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_onrecv), (mp_obj_t)&esp_socket_onrecv_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_onsent), (mp_obj_t)&esp_socket_onsent_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_ondisconnect), (mp_obj_t)&esp_socket_ondisconnect_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_onreconnect), (mp_obj_t)&esp_socket_onreconnect_obj },
-    { MP_OBJ_NEW_QSTR(MP_QSTR_state), (mp_obj_t)&esp_socket_state_obj }
-};
-STATIC MP_DEFINE_CONST_DICT(esp_socket_locals_dict, esp_socket_locals_dict_table);
-
-STATIC const mp_obj_type_t esp_socket_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_socket,
-    .make_new = esp_socket_make_new,
-    .locals_dict = (mp_obj_t)&esp_socket_locals_dict,
-};
-#endif
 
 #define MODESP_INCLUDE_CONSTANTS (1)
 
@@ -673,23 +674,27 @@ STATIC const mp_map_elem_t esp_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_deepsleep), (mp_obj_t)&esp_deepsleep_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_flash_id), (mp_obj_t)&esp_flash_id_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_flash_read), (mp_obj_t)&esp_flash_read_obj },
-    #if MODESP_ESPCONN
+#if MODESP_ESPCONN
     { MP_OBJ_NEW_QSTR(MP_QSTR_socket), (mp_obj_t)&esp_socket_type },
+#endif
     { MP_OBJ_NEW_QSTR(MP_QSTR_os_timer), (mp_obj_t)&esp_os_timer_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_os_task), (mp_obj_t)&esp_os_task_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_gpio), (mp_obj_t)&mp_module_esp_gpio },
+#if MICROPY_MODULE_ESP_DHT
     { MP_OBJ_NEW_QSTR(MP_QSTR_dht), (mp_obj_t)&esp_dht_type },
+#endif
     { MP_OBJ_NEW_QSTR(MP_QSTR_mutex), (mp_obj_t)&esp_mutex_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR___init__), (mp_obj_t)&esp__init__obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_test), (mp_obj_t)&esp_test_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_I2C), (mp_obj_t)&esp_I2C_type },
+#if MICROPY_MODULE_ESP_1WIRE
     { MP_OBJ_NEW_QSTR(MP_QSTR_one_wire), (mp_obj_t)&esp_1wire_type },
+#endif
     { MP_OBJ_NEW_QSTR(MP_QSTR_queue), (mp_obj_t)&esp_queue_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_smartconfig), (mp_obj_t)&mp_module_esp_smartconfig},
     { MP_OBJ_NEW_QSTR(MP_QSTR_wifi_events), (mp_obj_t)&mp_module_esp_wifi_events},
     { MP_OBJ_NEW_QSTR(MP_QSTR_getaddrinfo), (mp_obj_t)&esp_getaddrinfo_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_ws), (mp_obj_t)&esp_ws_type },
-    #endif
 
 #if MODESP_INCLUDE_CONSTANTS
     { MP_OBJ_NEW_QSTR(MP_QSTR_MODE_11B),

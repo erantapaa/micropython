@@ -1,6 +1,8 @@
 #ifndef _INCLUDED_MOD_ESP_DHT_H_
 #define _INCLUDED_MOD_ESP_DHT_H_
 
+#if MICROPY_MODULE_ESP_DHT
 extern const mp_obj_type_t esp_dht_type;
-// extern void os_task_post(mp_obj_t *callback, mp_obj_t *arg);
+#endif
+
 #endif // _INCLUDED_MOD_ESP_DHT_H_
